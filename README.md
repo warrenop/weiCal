@@ -52,6 +52,10 @@
 
 ![Tour spotlight](docs/screenshots/07-tour-spotlight.png)
 
+### 应用内更新提示（启动时检查 Github Releases，每 24h 一次）
+
+![Update notifier](docs/screenshots/08-update-toast.png)
+
 ---
 
 ## 功能
@@ -274,7 +278,7 @@ weiCal/
 - [ ] PWA 端 service worker 离线缓存
 - [ ] 预算 / 提醒功能
 - [ ] 多账户支持（夫妻 / 室友各自加密库）
-- [ ] 应用内自动更新
+- [x] 应用内更新提示（v0.4.3+）
 
 ---
 

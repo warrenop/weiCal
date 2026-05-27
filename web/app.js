@@ -717,6 +717,68 @@ async function renderIncome() {
 
 $('#inc-year').addEventListener?.('change', renderIncome);
 
+// ---------- update check (Github Releases) ----------
+function cmpVersion(a, b) {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x - y;
+  }
+  return 0;
+}
+
+async function checkForUpdates() {
+  const current = state.meta.version;
+  const repo = state.meta.repo;
+  if (!current || !repo) return;
+
+  // Throttle: max once per 24h
+  const LAST_KEY = 'mycal-update-last-check';
+  const DISMISS_KEY = 'mycal-update-dismissed';
+  const last = +(localStorage.getItem(LAST_KEY) || 0);
+  if (Date.now() - last < 24 * 3600 * 1000) {
+    // Still re-show toast if a cached newer version exists and is undismissed
+    const cached = localStorage.getItem('mycal-update-latest');
+    if (cached && cmpVersion(cached, current) > 0
+        && localStorage.getItem(DISMISS_KEY) !== cached) {
+      showUpdateToast(cached, repo, current);
+    }
+    return;
+  }
+
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    const latest = String(data.tag_name || '').replace(/^v/, '');
+    if (!latest) return;
+
+    localStorage.setItem(LAST_KEY, String(Date.now()));
+    localStorage.setItem('mycal-update-latest', latest);
+
+    if (cmpVersion(latest, current) <= 0) return;
+    if (localStorage.getItem(DISMISS_KEY) === latest) return;
+
+    showUpdateToast(latest, repo, current, data.html_url);
+  } catch (e) {
+    // Offline or rate-limited — silently ignore
+  }
+}
+
+function showUpdateToast(latest, repo, current, htmlUrl) {
+  $('#ut-version').textContent = 'v' + latest;
+  $('#ut-current').textContent = `(当前 v${current})`;
+  $('#ut-link').href = htmlUrl || `https://github.com/${repo}/releases/tag/v${latest}`;
+  $('#update-toast').classList.remove('hidden');
+  $('#ut-dismiss').onclick = () => {
+    localStorage.setItem('mycal-update-dismissed', latest);
+    $('#update-toast').classList.add('hidden');
+  };
+}
+
 // ---------- bootstrap ----------
 (async function init() {
   state.meta = await api('/api/meta');
@@ -732,6 +794,7 @@ $('#inc-year').addEventListener?.('change', renderIncome);
   if (!hasAnyData()) {
     showWelcome();
     await refreshSyncStatus();   // keeps "尚未导入" label honest
+    setTimeout(checkForUpdates, 1500);
     return;
   }
   // If the current month has no data, jump to the most recent month that does.
@@ -747,4 +810,6 @@ $('#inc-year').addEventListener?.('change', renderIncome);
   }
   showView('overview');
   await refreshSyncStatus();
+  // Fire update check after main UI is ready; non-blocking
+  setTimeout(checkForUpdates, 1500);
 })();

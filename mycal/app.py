@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import __version__, db
 from .categorizer import ALL_CATEGORIES, CATEGORY_COLORS
 from .routes import imports, summary, transactions
 
@@ -39,7 +39,12 @@ def create_app() -> FastAPI:
 
     @app.get("/api/meta")
     def meta():
-        return {"categories": ALL_CATEGORIES, "colors": CATEGORY_COLORS}
+        return {
+            "categories": ALL_CATEGORIES,
+            "colors": CATEGORY_COLORS,
+            "version": __version__,
+            "repo": "warrenop/weiCal",
+        }
 
     @app.post("/api/admin/reset")
     def reset_all():

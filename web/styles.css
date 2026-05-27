@@ -297,6 +297,44 @@ th { color: var(--muted); }
 }
 .month-jump:hover { transform: translateY(-1px); border-color: var(--primary); }
 
+/* ===== App-update toast ===== */
+#update-toast {
+  position: fixed; left: 50%; bottom: 28px;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px 12px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(139,92,246,.96), rgba(236,72,153,.96));
+  color: white; font-size: 13px;
+  box-shadow: 0 16px 40px rgba(139,92,246,.45);
+  z-index: 90;
+  animation: utSlide .45s cubic-bezier(.22,1,.36,1);
+}
+#update-toast .ut-emoji { font-size: 18px; }
+#update-toast .ut-text { line-height: 1.35; }
+#update-toast .ut-text b { font-weight: 600; }
+#update-toast .ut-current {
+  font-size: 11px; opacity: .8; margin-left: 4px;
+}
+#update-toast .ut-btn {
+  background: rgba(255,255,255,.22);
+  color: white; padding: 5px 12px; border-radius: 8px;
+  font-size: 12px; font-weight: 500;
+  transition: background .15s;
+}
+#update-toast .ut-btn:hover { background: rgba(255,255,255,.32); }
+#update-toast .ut-x {
+  background: transparent; color: rgba(255,255,255,.7);
+  font-size: 18px; line-height: 1; padding: 0 4px;
+  margin-left: 2px;
+  transition: color .15s;
+}
+#update-toast .ut-x:hover { color: white; }
+@keyframes utSlide {
+  from { transform: translate(-50%, 20px); opacity: 0; }
+  to   { transform: translate(-50%, 0);    opacity: 1; }
+}
+
 /* ===== Guided tour ===== */
 #tour { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
 #tour.active { pointer-events: auto; }
