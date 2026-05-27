@@ -27,7 +27,30 @@
 
 ## 截图
 
-> （TODO：贴上「欢迎页 / 总览 / 收入 / 导览 spotlight / 深浅模式」截图）
+### 首次启动 · 欢迎引导
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/02-welcome-dark.png">
+  <img src="docs/screenshots/01-welcome-light.png" alt="Welcome screen">
+</picture>
+
+### 总览 · 深浅双主题
+
+| Light | Dark |
+|---|---|
+| ![Overview Light](docs/screenshots/04-overview-light.png) | ![Overview Dark](docs/screenshots/03-overview-dark.png) |
+
+### 分类 · 玫瑰图
+
+![Categories rose chart](docs/screenshots/06-categories-light.png)
+
+### 收入 · 月度现金流
+
+![Income cashflow](docs/screenshots/05-income-light.png)
+
+### 引导导览（首次启动自动触发，「?」按钮可重新开启）
+
+![Tour spotlight](docs/screenshots/07-tour-spotlight.png)
 
 ---
 

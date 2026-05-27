@@ -13,6 +13,8 @@ dist/
 # Local test artifacts / screenshots
 *.png
 *.jpeg
+!docs/screenshots/*.png
+!docs/screenshots/*.jpeg
 .playwright-mcp/
 
 # OS / editor cruft
