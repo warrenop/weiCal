@@ -1,0 +1,20 @@
+{
+  "name": "微记账本",
+  "short_name": "微记账本",
+  "description": "本地加密的微信账单可视化记账工具",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07091a",
+  "theme_color": "#7c3aed",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

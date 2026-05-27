@@ -1,0 +1,25 @@
+[project]
+name = "mycal"
+version = "0.4.0"
+description = "微记账本 — 本地加密的微信账单可视化记账"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.5",
+    "python-multipart>=0.0.9",
+    "openpyxl>=3.1",
+    "sqlcipher3-wheels>=0.5",
+    "keyring>=24.0",
+    "pywebview>=5.0",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mycal*"]

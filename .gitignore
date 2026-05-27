@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+
+# Legacy local data dir (data is now stored in OS app-data location).
+data/
+
+# PyInstaller build artifacts
+build/
+dist/
+
+# Local test artifacts / screenshots
+*.png
+*.jpeg
+.playwright-mcp/
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code / Cursor / Copilot local settings
+.claude/
