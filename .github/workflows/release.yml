@@ -31,7 +31,10 @@ jobs:
           - os: ubuntu-latest
             label: Linux x64
             asset: weiCal-linux-x64.tar.gz
+            allow_failure: true
     runs-on: ${{ matrix.os }}
+    # Linux is allow_failure — webkit2gtk packaging is fragile across distros
+    continue-on-error: ${{ matrix.allow_failure == true }}
 
     steps:
       - uses: actions/checkout@v4
@@ -41,17 +44,26 @@ jobs:
           python-version: '3.12'
 
       # --- Linux only: webkit2gtk runtime + GObject Introspection ---
+      # The webkit2gtk package name varies across Ubuntu releases:
+      #   24.04 (noble):  libwebkit2gtk-4.1-0  +  gir1.2-webkit2-4.1
+      #   22.04 (jammy):  libwebkit2gtk-4.0-37 +  gir1.2-webkit-4.0
+      # Try both, ignore whichever isn't available.
       - name: Install Linux system deps
         if: matrix.os == 'ubuntu-latest'
         run: |
+          set -e
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-0 \
-            gir1.2-webkit2-4.1 \
             libgirepository1.0-dev \
             libcairo2-dev \
             pkg-config
-          pip install --upgrade pip
+          # WebKit2GTK — install whichever version this Ubuntu has
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-0 gir1.2-webkit2-4.1 \
+            || sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.0-37 gir1.2-webkit-4.0 \
+            || echo "neither webkit2gtk-4.1 nor 4.0 installed — Linux build will likely fail"
+          python -m pip install --upgrade pip
           pip install PyGObject pycairo
 
       - name: Install Python deps
@@ -95,9 +107,11 @@ jobs:
     name: Publish release
     needs: build
     runs-on: ubuntu-latest
+    # `always()` so we still publish even if one platform (typically Linux)
+    # fails — partial Release is better than no Release.
     # Only auto-publish on tag pushes — manual runs just upload the artifacts
     # to the workflow run for download/inspection.
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: always() && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/download-artifact@v4
         with:
