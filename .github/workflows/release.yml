@@ -1,0 +1,136 @@
+name: Release
+
+# Trigger:
+#   - Push a tag like `v0.4.0` → build all 3 platforms in parallel and attach
+#     the resulting bundles to a Github Release.
+#   - Manual `workflow_dispatch` for testing without tagging.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create the Release
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS (Apple Silicon)
+            asset: weiCal-macos-arm64.zip
+          - os: macos-13
+            label: macOS (Intel)
+            asset: weiCal-macos-x64.zip
+          - os: windows-latest
+            label: Windows x64
+            asset: weiCal-windows-x64.zip
+          - os: ubuntu-latest
+            label: Linux x64
+            asset: weiCal-linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # --- Linux only: webkit2gtk runtime + GObject Introspection ---
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-0 \
+            gir1.2-webkit2-4.1 \
+            libgirepository1.0-dev \
+            libcairo2-dev \
+            pkg-config
+          pip install --upgrade pip
+          pip install PyGObject pycairo
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[build]"
+
+      - name: Build with PyInstaller
+        run: pyinstaller mycal.spec --noconfirm
+
+      # --- Package per OS ---
+      - name: Package (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          cd dist
+          ditto -c -k --keepParent --sequesterRsrc "微记账本.app" "../${{ matrix.asset }}"
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\mycal -DestinationPath ${{ matrix.asset }}
+
+      - name: Package (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd dist
+          tar czf ../${{ matrix.asset }} mycal
+
+      - name: Show artifact size
+        shell: bash
+        run: ls -lh ${{ matrix.asset }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    # Only auto-publish on tag pushes — manual runs just upload the artifacts
+    # to the workflow run for download/inspection.
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          name: 微记账本 ${{ github.ref_name }}
+          body: |
+            ## 下载
+
+            选择匹配你系统的版本：
+
+            - **macOS Apple Silicon (M1/M2/M3)** → `weiCal-macos-arm64.zip`
+            - **macOS Intel** → `weiCal-macos-x64.zip`
+            - **Windows x64** → `weiCal-windows-x64.zip`
+            - **Linux x64** → `weiCal-linux-x64.tar.gz`
+
+            ## 安装
+
+            **macOS**：解压后把「微记账本.app」拖到「应用程序」。首次打开右键 → 「打开」绕过 Gatekeeper（未签名）。
+
+            **Windows**：解压到任意目录，双击 `mycal.exe`。Defender 可能拦截，选「仍要运行」。
+
+            **Linux**：解压后运行 `./mycal/mycal`。需要 `libwebkit2gtk-4.1-0` 运行时。
+
+            ## 数据位置 / 加密
+
+            数据存在系统标准应用数据目录，AES-256 加密，密钥由 OS Keychain 保管。
+            详见 [README](https://github.com/${{ github.repository }}#readme).
