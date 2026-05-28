@@ -624,47 +624,86 @@ async function renderBudgets() {
     const colorStyle = it.category === '_total'
       ? 'background: linear-gradient(135deg,#8b5cf6,#ec4899)'
       : `background: ${_budgetColor(it.category)}`;
+
+    // Override badge inline with title; subtitle row with "默认 ¥X | 撤销"
+    const overrideTag = it.is_override ? '<span class="bg-override-tag">本月覆盖</span>' : '';
+    const subRow = (() => {
+      if (it.is_override && it.default_amount != null) {
+        return `<div class="bg-card-sub">默认 ${money(it.default_amount)}
+                  <a data-act="revert" data-cat="${escapeHtml(it.category)}">撤销本月覆盖</a></div>`;
+      }
+      if (it.is_override && it.default_amount == null) {
+        return `<div class="bg-card-sub">仅此月（无默认）
+                  <a data-act="revert" data-cat="${escapeHtml(it.category)}">撤销本月</a></div>`;
+      }
+      return '';
+    })();
+
     card.innerHTML = `
       <div class="budget-pct-pill">${it.percent}%</div>
       <div class="budget-head">
-        <div class="budget-name"><span class="budget-dot" style="${colorStyle}"></span>${escapeHtml(_budgetLabel(it.category))}</div>
+        <div class="budget-name"><span class="budget-dot" style="${colorStyle}"></span>${escapeHtml(_budgetLabel(it.category))}${overrideTag}</div>
       </div>
       <div class="budget-amounts">
         <span class="budget-spent">${money(it.spent)}</span>
         <span class="budget-of">/ ${money(it.budget)}</span>
       </div>
       <div class="budget-bar-track"><div class="budget-bar-fill" style="width:${widthPct}%"></div></div>
+      ${subRow}
       <div class="budget-footer">
         <span>${remaining}</span>
         <div class="budget-actions">
-          <button data-act="edit" data-cat="${escapeHtml(it.category)}" data-amt="${it.budget}">编辑</button>
-          <button data-act="del"  data-cat="${escapeHtml(it.category)}">删除</button>
+          <button data-act="edit" data-cat="${escapeHtml(it.category)}"
+                  data-amt="${it.budget}" data-is-override="${it.is_override}"
+                  data-default="${it.default_amount ?? ''}">编辑</button>
+          <button data-act="del" data-cat="${escapeHtml(it.category)}"
+                  data-has-default="${it.default_amount != null}">删除</button>
         </div>
       </div>`;
     grid.appendChild(card);
   }
 
   // Hook actions
-  grid.querySelectorAll('button[data-act]').forEach(b => {
+  grid.querySelectorAll('button[data-act], a[data-act]').forEach(b => {
     b.onclick = async () => {
       const cat = b.dataset.cat;
-      if (b.dataset.act === 'del') {
-        if (!confirm(`确定删除「${_budgetLabel(cat)}」的预算？`)) return;
-        await api(`/api/budgets/${encodeURIComponent(cat)}`, { method: 'DELETE' });
-        toast('已删除');
+      const act = b.dataset.act;
+      const period = `${$('#bg-year').value}-${String($('#bg-month').value).padStart(2,'0')}`;
+
+      if (act === 'revert') {
+        if (!confirm(`撤销「${_budgetLabel(cat)}」在 ${period} 的本月覆盖？\n该月将回到默认值（如无默认则不再有预算）。`)) return;
+        await api(`/api/budgets/${encodeURIComponent(cat)}?period=${period}`, { method: 'DELETE' });
+        toast('已撤销本月覆盖');
         renderBudgets(); refreshKpiBudgetBadge();
-      } else {
-        const cur = +b.dataset.amt;
-        const v = prompt(`设置「${_budgetLabel(cat)}」每月预算（元）`, cur);
-        if (v == null) return;
-        const amt = parseFloat(v);
-        if (!(amt >= 0)) { toast('请输入有效数字'); return; }
-        await api(`/api/budgets/${encodeURIComponent(cat)}`, {
-          method: 'PUT', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ amount: amt }),
+        return;
+      }
+
+      if (act === 'del') {
+        const hasDefault = b.dataset.hasDefault === 'true';
+        const msg = hasDefault
+          ? `删除「${_budgetLabel(cat)}」的默认预算？\n（所有该分类的本月覆盖也会保留，但失去默认基线）`
+          : `删除「${_budgetLabel(cat)}」？`;
+        if (!confirm(msg)) return;
+        try {
+          await api(`/api/budgets/${encodeURIComponent(cat)}`, { method: 'DELETE' });
+          toast('已删除');
+        } catch (e) {
+          // If only override exists (no default), DELETE without period 404s — fall back
+          await api(`/api/budgets/${encodeURIComponent(cat)}?period=${period}`, { method: 'DELETE' });
+          toast('已删除本月覆盖');
+        }
+        renderBudgets(); refreshKpiBudgetBadge();
+        return;
+      }
+
+      if (act === 'edit') {
+        openBudgetEditModal({
+          category: cat,
+          currentAmount: +b.dataset.amt,
+          isOverride: b.dataset.isOverride === 'true',
+          defaultAmount: b.dataset.default ? +b.dataset.default : null,
+          period,
         });
-        toast('已更新');
-        renderBudgets(); refreshKpiBudgetBadge();
       }
     };
   });
@@ -699,6 +738,57 @@ function _bindBudgetAdd() {
     renderBudgets(); refreshKpiBudgetBadge();
   };
 }
+
+// ---------- Budget edit modal ----------
+let _budgetEditCtx = null;
+
+function openBudgetEditModal({ category, currentAmount, isOverride, defaultAmount, period }) {
+  _budgetEditCtx = { category, period };
+  $('#bg-edit-title').textContent = `编辑「${_budgetLabel(category)}」预算`;
+  const subParts = [];
+  subParts.push(`当前 ${money(currentAmount)}`);
+  if (defaultAmount != null) subParts.push(`默认 ${money(defaultAmount)}`);
+  if (isOverride) subParts.push(`本月覆盖中`);
+  $('#bg-edit-sub').textContent = subParts.join(' · ');
+  $('#bg-edit-amount').value = currentAmount;
+  $('#bg-edit-error').classList.add('hidden');
+  $('#bg-scope-period-label').textContent = `仅 ${period}`;
+
+  // Pre-select scope based on current state
+  const scope = isOverride ? 'override' : 'default';
+  document.querySelectorAll('input[name="bg-scope"]').forEach(r => {
+    r.checked = (r.value === scope);
+  });
+
+  openModal('modal-budget');
+  setTimeout(() => $('#bg-edit-amount').focus(), 80);
+}
+
+$('#bg-edit-save').onclick = async () => {
+  const ctx = _budgetEditCtx;
+  if (!ctx) return;
+  const amt = parseFloat($('#bg-edit-amount').value);
+  if (!(amt >= 0)) {
+    const e = $('#bg-edit-error'); e.textContent = '请输入有效金额'; e.classList.remove('hidden');
+    return;
+  }
+  const scope = document.querySelector('input[name="bg-scope"]:checked').value;
+  const url = scope === 'override'
+    ? `/api/budgets/${encodeURIComponent(ctx.category)}?period=${ctx.period}`
+    : `/api/budgets/${encodeURIComponent(ctx.category)}`;
+  try {
+    await api(url, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: amt }),
+    });
+    toast(scope === 'override' ? `已设置 ${ctx.period} 本月覆盖` : '已更新默认值');
+    closeModal('modal-budget');
+    _budgetEditCtx = null;
+    renderBudgets(); refreshKpiBudgetBadge();
+  } catch (e) {
+    const el = $('#bg-edit-error'); el.textContent = e.message; el.classList.remove('hidden');
+  }
+};
 
 // ---------- KPI overview badge ----------
 async function refreshKpiBudgetBadge() {

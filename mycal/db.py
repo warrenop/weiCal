@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS import_logs (
     imported_at     TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
--- Monthly budget configuration. One row per category. The pseudo-category
+-- Monthly budget configuration. One row per category — the "default" budget
+-- that applies to every month unless an override exists. The pseudo-category
 -- "_total" represents the overall monthly budget.
 CREATE TABLE IF NOT EXISTS budgets (
     category   TEXT PRIMARY KEY,
@@ -84,6 +85,20 @@ CREATE TABLE IF NOT EXISTS budgets (
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
+
+-- Per-month override of a budget for a specific (category, period). When
+-- present this takes precedence over the default in `budgets`. Allows
+-- short-term changes (vacation month, salary bump, etc.) without losing the
+-- baseline default.
+CREATE TABLE IF NOT EXISTS budget_overrides (
+    category   TEXT NOT NULL,
+    period     TEXT NOT NULL,                       -- YYYY-MM
+    amount     REAL NOT NULL CHECK (amount >= 0),
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    PRIMARY KEY (category, period)
+);
+CREATE INDEX IF NOT EXISTS idx_bg_overrides_period ON budget_overrides(period);
 """
 
 
