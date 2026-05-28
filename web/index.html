@@ -324,25 +324,60 @@
 
 <!-- 上传弹窗 -->
 <div id="modal-upload" class="modal hidden">
-  <div class="modal-box">
-    <h2 class="text-lg font-bold mb-1">导入账单</h2>
-    <p class="text-sm text-[var(--muted)] mb-4">
-      支持<b>微信</b>和<b>支付宝</b>官方账单 CSV / xlsx，自动识别来源。<br>
-      • 微信：我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单<br>
-      • 支付宝：我 → 账单 → 右上角 ⚙️ → 开具交易流水证明 → 用于个人对账
-    </p>
-    <input id="csv-file" type="file" accept=".csv,.xlsx,.xlsm" class="mb-4 block w-full text-sm">
-    <div id="upload-progress" class="hidden mb-3">
+  <div class="modal-box" style="max-width: 34rem;">
+    <!-- 步骤指示 -->
+    <div class="wiz-steps">
+      <div class="wiz-step is-active" data-step="1"><span class="wiz-num">1</span>选来源</div>
+      <div class="wiz-bar"></div>
+      <div class="wiz-step" data-step="2"><span class="wiz-num">2</span>选文件</div>
+      <div class="wiz-bar"></div>
+      <div class="wiz-step" data-step="3"><span class="wiz-num">3</span>确认导入</div>
+    </div>
+
+    <!-- 步骤 1：选来源 + 指引 -->
+    <div class="wiz-pane" data-pane="1">
+      <div class="wiz-source-grid">
+        <button class="wiz-source" data-source="wechat">
+          <span class="wiz-source-ico" style="background:linear-gradient(135deg,#22c55e,#16a34a)">微</span>
+          <span>微信账单</span>
+        </button>
+        <button class="wiz-source" data-source="alipay">
+          <span class="wiz-source-ico" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">支</span>
+          <span>支付宝账单</span>
+        </button>
+      </div>
+      <div id="wiz-guide" class="wiz-guide hidden"></div>
+    </div>
+
+    <!-- 步骤 2：选文件 -->
+    <div class="wiz-pane hidden" data-pane="2">
+      <p class="text-sm text-[var(--muted)] mb-3">选择从<b id="wiz-src-name">…</b>导出并解压得到的 <code>.csv</code> / <code>.xlsx</code> 文件。上传后会自动解析预览，<b>暂不写入</b>。</p>
+      <input id="csv-file" type="file" accept=".csv,.xlsx,.xlsm" class="mb-3 block w-full text-sm">
+      <div id="wiz-parse" class="wiz-parse hidden"></div>
+    </div>
+
+    <!-- 步骤 3：确认导入 -->
+    <div class="wiz-pane hidden" data-pane="3">
+      <div id="wiz-preview"></div>
+    </div>
+
+    <!-- 进度条（提交时） -->
+    <div id="upload-progress" class="hidden mt-3">
       <div class="flex justify-between text-xs text-[var(--muted)] mb-1">
-        <span id="upload-stage">上传中…</span>
-        <span id="upload-percent">0%</span>
+        <span id="upload-stage">导入中…</span>
+        <span id="upload-percent"></span>
       </div>
       <div class="progress-track"><div id="upload-bar" class="progress-bar"></div></div>
     </div>
-    <div id="upload-result" class="text-sm mb-3"></div>
-    <div class="flex justify-end gap-2">
-      <button class="modal-close btn-ghost">取消</button>
-      <button id="btn-upload" class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">上传</button>
+    <div id="upload-result" class="text-sm mt-3"></div>
+
+    <!-- 底部导航 -->
+    <div class="wiz-footer">
+      <button id="wiz-back" class="btn-ghost" style="visibility:hidden">上一步</button>
+      <div class="flex gap-2">
+        <button class="modal-close btn-ghost">取消</button>
+        <button id="wiz-next" class="btn-primary" disabled>下一步</button>
+      </div>
     </div>
   </div>
 </div>

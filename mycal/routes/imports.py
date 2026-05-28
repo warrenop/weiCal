@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from datetime import datetime
 from ..db import get_conn
-from ..importer import import_bill
+from ..importer import import_bill, preview_bill
 
 router = APIRouter(prefix="/api/imports", tags=["imports"])
 
@@ -12,6 +12,19 @@ async def _do_upload(file: UploadFile) -> dict:
         raise HTTPException(400, "empty file")
     try:
         return import_bill(raw, file.filename or "upload.csv")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/preview")
+async def preview(file: UploadFile = File(...)):
+    """Parse a bill WITHOUT importing — returns stats + dedup estimate +
+    sample rows for the import wizard's confirmation step."""
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "empty file")
+    try:
+        return preview_bill(raw, file.filename or "upload.csv")
     except ValueError as e:
         raise HTTPException(400, str(e))
 

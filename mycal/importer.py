@@ -211,6 +211,76 @@ def parse_bill(raw_bytes: bytes, file_name: str = "") -> tuple[str, list[dict]]:
     return source, rows
 
 
+def preview_bill(raw_bytes: bytes, file_name: str) -> dict:
+    """Parse without writing. Returns source + stats + dedup estimate + a few
+    sample rows so the import wizard can show a confirmation step."""
+    source, rows = parse_bill(raw_bytes, file_name)
+
+    total = len(rows)
+    expense_rows = [r for r in rows if r["direction"] == "expense"]
+    income_rows = [r for r in rows if r["direction"] == "income"]
+    expense_sum = round(sum(r["amount"] for r in expense_rows), 2)
+    income_sum = round(sum(r["amount"] for r in income_rows), 2)
+
+    period_start = period_end = None
+    if rows:
+        times = sorted(r["tx_time"] for r in rows)
+        period_start, period_end = times[0][:10], times[-1][:10]
+
+    # Dedup estimate: how many wx_tx_id already exist in the active doc
+    ids = [r["wx_tx_id"] for r in rows if r["wx_tx_id"]]
+    existing = 0
+    if ids:
+        with get_conn() as conn:
+            placeholders = ",".join("?" * len(ids))
+            row = conn.execute(
+                f"SELECT COUNT(*) AS n FROM transactions WHERE wx_tx_id IN ({placeholders})",
+                ids,
+            ).fetchone()
+            existing = row["n"]
+    # Rows without a tx id can't be dedup-checked → treated as new
+    will_insert = total - existing
+
+    # Category breakdown (expense only)
+    cat_counts: dict[str, dict] = {}
+    for r in expense_rows:
+        c = cat_counts.setdefault(r["category"], {"count": 0, "amount": 0.0})
+        c["count"] += 1
+        c["amount"] += r["amount"]
+    categories = sorted(
+        [{"category": k, "count": v["count"], "amount": round(v["amount"], 2)}
+         for k, v in cat_counts.items()],
+        key=lambda x: -x["amount"],
+    )
+
+    samples = [
+        {
+            "tx_time": r["tx_time"],
+            "counterparty": r["counterparty"],
+            "product": r["product"],
+            "amount": r["amount"],
+            "direction": r["direction"],
+            "category": r["category"],
+        }
+        for r in rows[:8]
+    ]
+
+    return {
+        "source": source,
+        "total": total,
+        "will_insert": will_insert,
+        "duplicates": existing,
+        "expense_count": len(expense_rows),
+        "income_count": len(income_rows),
+        "expense_sum": expense_sum,
+        "income_sum": income_sum,
+        "period_start": period_start,
+        "period_end": period_end,
+        "categories": categories,
+        "samples": samples,
+    }
+
+
 def import_bill(raw_bytes: bytes, file_name: str) -> dict:
     source, rows = parse_bill(raw_bytes, file_name)
     inserted = skipped = failed = 0

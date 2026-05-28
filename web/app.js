@@ -429,76 +429,175 @@ async function renderImports() {
   });
 }
 
-// ---------- upload modal ----------
-function resetUploadUI() {
-  $('#upload-result').textContent = '';
+// ---------- import wizard ----------
+const SOURCE_GUIDE = {
+  wechat: {
+    name: '微信',
+    color: 'linear-gradient(135deg,#22c55e,#16a34a)',
+    steps: [
+      '打开微信 → 我 → 服务 → 钱包 → 账单',
+      '右上角「常见问题」→「下载账单」',
+      '选「用于个人对账」，按月申请',
+      '邮箱收到压缩包，解压得到 <code>.csv</code> 文件',
+    ],
+    tip: '微信账单密码就是你申请时设置的解压密码；解压后再上传。',
+  },
+  alipay: {
+    name: '支付宝',
+    color: 'linear-gradient(135deg,#3b82f6,#2563eb)',
+    steps: [
+      '打开支付宝 → 我 → 账单',
+      '右上角 ⚙️ →「开具交易流水证明」',
+      '选「用于个人对账」，选好月份申请',
+      '邮箱收到压缩包，解压得到 <code>.csv</code> 文件',
+    ],
+    tip: '「不计收支」（如余额宝转入）和未完成交易会被自动跳过。',
+  },
+};
+
+const wiz = { step: 1, source: null, preview: null, file: null };
+
+function resetWizard() {
+  wiz.step = 1; wiz.source = null; wiz.preview = null; wiz.file = null;
   $('#csv-file').value = '';
+  $('#wiz-guide').classList.add('hidden');
+  $('#wiz-parse').className = 'wiz-parse hidden';
+  $('#wiz-preview').innerHTML = '';
   $('#upload-progress').classList.add('hidden');
-  $('#upload-bar').classList.remove('indeterminate');
-  $('#upload-bar').style.width = '0%';
-  $('#upload-percent').textContent = '0%';
-  $('#upload-stage').textContent = '上传中…';
-  $('#btn-upload').disabled = false;
-}
-
-$('#btn-refresh').onclick = () => { resetUploadUI(); openModal('modal-upload'); };
-
-function uploadWithProgress(file) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/imports/wechat');
-    xhr.upload.onprogress = (e) => {
-      if (!e.lengthComputable) return;
-      const pct = Math.round((e.loaded / e.total) * 100);
-      $('#upload-bar').style.width = pct + '%';
-      $('#upload-percent').textContent = pct + '%';
-      if (pct >= 100) {
-        $('#upload-stage').textContent = '服务器解析中…';
-        $('#upload-percent').textContent = '';
-        $('#upload-bar').classList.add('indeterminate');
-      }
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try { resolve(JSON.parse(xhr.responseText)); } catch (e) { reject(e); }
-      } else {
-        reject(new Error(xhr.responseText || xhr.statusText));
-      }
-    };
-    xhr.onerror = () => reject(new Error('网络错误'));
-    const fd = new FormData(); fd.append('file', file);
-    xhr.send(fd);
-  });
-}
-
-$('#btn-upload').onclick = async () => {
-  const f = $('#csv-file').files[0];
-  if (!f) { $('#upload-result').innerHTML = '<span class="text-rose-600">请选择 CSV 或 xlsx 文件</span>'; return; }
   $('#upload-result').textContent = '';
+  $$('.wiz-source').forEach(b => b.classList.remove('is-selected'));
+  renderWizardStep();
+}
+
+function renderWizardStep() {
+  // panes
+  $$('.wiz-pane').forEach(p => p.classList.toggle('hidden', +p.dataset.pane !== wiz.step));
+  // step indicators
+  $$('.wiz-step').forEach(s => {
+    const n = +s.dataset.step;
+    s.classList.toggle('is-active', n === wiz.step);
+    s.classList.toggle('is-done', n < wiz.step);
+  });
+  // nav buttons
+  $('#wiz-back').style.visibility = wiz.step === 1 ? 'hidden' : 'visible';
+  const next = $('#wiz-next');
+  if (wiz.step === 1) { next.textContent = '下一步'; next.disabled = !wiz.source; }
+  else if (wiz.step === 2) { next.textContent = '下一步'; next.disabled = !wiz.preview; }
+  else { next.textContent = `确认导入 ${wiz.preview ? wiz.preview.will_insert : ''} 条`; next.disabled = !wiz.preview; }
+}
+
+$('#btn-refresh').onclick = () => { resetWizard(); openModal('modal-upload'); };
+
+// Step 1: pick source
+$$('.wiz-source').forEach(btn => {
+  btn.onclick = () => {
+    wiz.source = btn.dataset.source;
+    $$('.wiz-source').forEach(b => b.classList.toggle('is-selected', b === btn));
+    const g = SOURCE_GUIDE[wiz.source];
+    $('#wiz-guide').innerHTML =
+      `<b>${g.name}账单获取步骤：</b><ol>${g.steps.map(s => `<li>${s}</li>`).join('')}</ol>`
+      + `<div class="wiz-tip">💡 ${g.tip}</div>`;
+    $('#wiz-guide').classList.remove('hidden');
+    $('#wiz-src-name').textContent = g.name;
+    renderWizardStep();
+  };
+});
+
+// Step 2: file → preview (parse, no write)
+$('#csv-file').addEventListener('change', async () => {
+  const f = $('#csv-file').files[0];
+  wiz.preview = null; wiz.file = f;
+  if (!f) { $('#wiz-parse').className = 'wiz-parse hidden'; renderWizardStep(); return; }
+  const p = $('#wiz-parse');
+  p.className = 'wiz-parse is-busy'; p.textContent = '正在解析…';
+  try {
+    const fd = new FormData(); fd.append('file', f);
+    const r = await fetch('/api/imports/preview', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || '解析失败');
+    const data = await r.json();
+    wiz.preview = data;
+    const srcName = { wechat: '微信', alipay: '支付宝' }[data.source] || '未知';
+    if (wiz.source && wiz.source !== data.source) {
+      p.className = 'wiz-parse is-err';
+      p.innerHTML = `⚠️ 你选了「${SOURCE_GUIDE[wiz.source].name}」但文件看起来是「${srcName}」账单。可继续，但请确认。`;
+    } else {
+      p.className = 'wiz-parse is-ok';
+      p.innerHTML = `✓ 识别为<b>${srcName}账单</b>，共解析 ${data.total} 条记录`;
+    }
+    renderWizardStep();
+  } catch (e) {
+    p.className = 'wiz-parse is-err';
+    p.textContent = '✗ ' + e.message;
+    wiz.preview = null;
+    renderWizardStep();
+  }
+});
+
+function renderPreviewPane() {
+  const d = wiz.preview;
+  if (!d) return;
+  const srcName = { wechat: '微信', alipay: '支付宝' }[d.source] || '账单';
+  const srcColor = d.source === 'alipay' ? '#2563eb' : '#16a34a';
+  const cats = d.categories.slice(0, 4)
+    .map(c => `${c.category} ${money(c.amount)}`).join(' · ') || '—';
+  const sampleRows = d.samples.map(s => `
+    <tr>
+      <td>${s.tx_time.slice(5,16)}</td>
+      <td>${escapeHtml((s.counterparty||'').slice(0,10))}</td>
+      <td class="amt" style="color:${s.direction==='income'?'#10b981':'#f43f5e'}">
+        ${s.direction==='income'?'+':'-'}${money(s.amount)}</td>
+      <td>${s.category}</td>
+    </tr>`).join('');
+  $('#wiz-preview').innerHTML = `
+    <div class="wiz-prev-head">
+      <span class="wiz-src-badge" style="background:${srcColor}">${srcName}账单</span>
+      <span class="text-sm text-[var(--muted)]">${d.period_start || ''} ~ ${d.period_end || ''}</span>
+    </div>
+    <div class="wiz-stats">
+      <div class="wiz-stat"><div class="lbl">记录数</div><div class="val">${d.total}</div></div>
+      <div class="wiz-stat"><div class="lbl">支出</div><div class="val text-rose-500">${money(d.expense_sum)}</div></div>
+      <div class="wiz-stat"><div class="lbl">收入</div><div class="val text-emerald-500">${money(d.income_sum)}</div></div>
+    </div>
+    <div class="wiz-dedup">
+      将新增 <b>${d.will_insert}</b> 条${d.duplicates ? `，跳过已存在 <b>${d.duplicates}</b> 条（按交易号去重）` : ''}。
+      ${d.categories.length ? `<br>主要支出分类：${cats}` : ''}
+    </div>
+    <div class="wiz-sample"><table><tbody>${sampleRows}</tbody></table></div>`;
+}
+
+// Wizard nav
+$('#wiz-back').onclick = () => { if (wiz.step > 1) { wiz.step--; renderWizardStep(); } };
+$('#wiz-next').onclick = async () => {
+  if (wiz.step === 1) { wiz.step = 2; renderWizardStep(); return; }
+  if (wiz.step === 2) { wiz.step = 3; renderPreviewPane(); renderWizardStep(); return; }
+  // step 3 → commit
+  await commitImport();
+};
+
+async function commitImport() {
+  const next = $('#wiz-next'); next.disabled = true;
+  $('#wiz-back').disabled = true;
   $('#upload-progress').classList.remove('hidden');
   $('#upload-bar').classList.remove('indeterminate');
   $('#upload-bar').style.width = '0%';
-  $('#upload-percent').textContent = '0%';
-  $('#upload-stage').textContent = '上传中…';
-  $('#btn-upload').disabled = true;
-
+  $('#upload-stage').textContent = '导入中…';
   try {
-    const r = await uploadWithProgress(f);
+    const fd = new FormData(); fd.append('file', wiz.file);
+    $('#upload-bar').classList.add('indeterminate');
+    const r = await fetch('/api/imports/bill', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error((await r.json()).detail || '导入失败');
+    const res = await r.json();
     $('#upload-bar').classList.remove('indeterminate');
     $('#upload-bar').style.width = '100%';
     $('#upload-stage').textContent = '✓ 导入完成';
-    $('#upload-percent').textContent = '';
-    const sourceLabel = { wechat: '微信账单', alipay: '支付宝账单' }[r.source] || '账单';
+    const label = { wechat: '微信账单', alipay: '支付宝账单' }[res.source] || '账单';
     $('#upload-result').innerHTML =
-      `<span class="text-emerald-700 font-medium">${sourceLabel}导入完成</span>：新增 ${r.inserted} 条，跳过重复 ${r.skipped} 条`
-      + (r.failed ? `，失败 ${r.failed} 条` : '')
-      + (r.period_start ? `<br>区间：${r.period_start} ~ ${r.period_end}` : '');
-    toast(`${sourceLabel}：+${r.inserted} 新增 / ${r.skipped} 重复`, 3500);
+      `<span class="text-emerald-700 font-medium">${label}导入完成</span>：新增 ${res.inserted} 条，跳过重复 ${res.skipped} 条`;
+    toast(`${label}：+${res.inserted} 新增 / ${res.skipped} 重复`, 3500);
 
     await refreshPeriods();
     await refreshSyncStatus();
-    // First successful import → leave welcome screen + maybe start tour
-    if (state.view === 'welcome' || !$('#view-welcome').classList.contains('hidden')) {
+    if (!$('#view-welcome').classList.contains('hidden')) {
       hideWelcome();
       showView('overview');
       setTimeout(() => window.maybeAutoStartTour && window.maybeAutoStartTour(), 800);
@@ -508,15 +607,14 @@ $('#btn-upload').onclick = async () => {
       if (state.view === 'imports') renderImports();
       if (state.view === 'income') renderIncome();
     }
-
-    setTimeout(() => { closeModal('modal-upload'); resetUploadUI(); }, 1200);
+    setTimeout(() => { closeModal('modal-upload'); resetWizard(); $('#wiz-back').disabled = false; }, 1200);
   } catch (e) {
     $('#upload-bar').classList.remove('indeterminate');
     $('#upload-stage').textContent = '失败';
     $('#upload-result').innerHTML = `<span class="text-rose-600">失败：${escapeHtml(e.message)}</span>`;
-    $('#btn-upload').disabled = false;
+    next.disabled = false; $('#wiz-back').disabled = false;
   }
-};
+}
 
 // ---------- new / edit modal ----------
 let editingId = null;

@@ -10,7 +10,7 @@
  * cache during the `activate` step.
  */
 
-const VERSION = 'mycal-v0.6.1';
+const VERSION = 'mycal-v0.6.2';
 // Same-origin shell — precache eagerly on install.
 // CDN bundles (Tailwind, ECharts) are large + may serve opaque cross-origin
 // responses; they are cached lazily by the fetch handler on first request.
