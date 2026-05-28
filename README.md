@@ -124,6 +124,41 @@ export MYCAL_DATA_DIR="$HOME/Dropbox/mycal"
 
 ---
 
+## 卸载
+
+卸载分三部分：**程序本体** + **数据目录** + **钥匙串密钥**。
+
+### 一键脚本（推荐）
+
+脚本会清掉数据目录和钥匙串密钥（会先列出待删内容并要求输入 `YES` 确认）：
+
+```bash
+# macOS / Linux
+bash scripts/uninstall.sh          # 交互确认
+bash scripts/uninstall.sh --yes    # 跳过确认
+
+# Windows (PowerShell)
+.\scripts\uninstall.ps1            # 交互确认
+.\scripts\uninstall.ps1 -Yes       # 跳过确认
+```
+
+> ⚠️ 数据是加密的且无云端备份，删除后**不可恢复**。
+
+脚本**不会**删除 app 本体——请手动操作：
+- macOS：把「应用程序」里的 `微记账本.app` 拖到废纸篓
+- Windows / Linux：删除解压出来的 `mycal` 文件夹
+
+### 手动卸载
+
+| 项 | macOS | Linux | Windows |
+|---|---|---|---|
+| 程序 | 删 `微记账本.app` | 删 `mycal/` 目录 | 删 `mycal\` 文件夹 |
+| 数据 | `rm -rf ~/Library/Application\ Support/mycal/` | `rm -rf ~/.local/share/mycal/` | 删 `%LOCALAPPDATA%\mycal\` |
+| 密钥 | 钥匙串访问搜 `mycal` 删除 | seahorse/KWallet 搜 `mycal`（headless 随数据目录已删） | 凭据管理器搜 `mycal` 删除 |
+| 源码安装 | `pip uninstall mycal` + 删 repo | 同左 | 同左 |
+
+---
+
 ## 导入账单（微信 / 支付宝）
 
 上传时**自动识别来源**，无需手动选择。
