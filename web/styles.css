@@ -397,6 +397,79 @@ html.dark .bg-override-tag { color: #c4b5fd; }
 html.dark .kpi-budget-badge.is-warn { color: #fbbf24; }
 html.dark .kpi-budget-badge.is-over { color: #fb7185; }
 
+/* ===== Document switcher (header) ===== */
+.brand { position: relative; }
+.doc-switcher {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 6px; padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--row-hover); color: var(--fg);
+  font-size: 12px; font-weight: 500;
+  border: 1px solid transparent;
+  transition: all .15s;
+}
+.doc-switcher:hover { border-color: var(--card-border); background: var(--card-bg); }
+.doc-current { max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-caret { width: 12px; height: 12px; opacity: .6; }
+
+.doc-menu {
+  position: absolute;
+  top: calc(100% + 8px); left: 0;
+  min-width: 240px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.2);
+  z-index: 60;
+  animation: docMenuIn .15s ease-out;
+}
+@keyframes docMenuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.doc-menu-head {
+  font-size: 10px; color: var(--muted); padding: 6px 10px 4px;
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+}
+.doc-menu ul { list-style: none; padding: 0; margin: 0; }
+.doc-menu li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; border-radius: 8px;
+  cursor: pointer; font-size: 13px;
+  transition: background .12s;
+}
+.doc-menu li:hover { background: var(--row-hover); }
+.doc-menu li.is-current { background: linear-gradient(90deg, rgba(139,92,246,.12), transparent); }
+.doc-menu li.is-current::after {
+  content: '✓'; color: var(--primary); font-weight: bold;
+}
+.doc-menu-divider { height: 1px; background: var(--card-border); margin: 6px 0; }
+.doc-menu-item {
+  display: block; width: 100%; text-align: left;
+  padding: 6px 10px; border-radius: 8px;
+  font-size: 13px; color: var(--fg);
+  background: transparent;
+  transition: background .12s;
+}
+.doc-menu-item:hover { background: var(--row-hover); }
+
+/* Manage list */
+.doc-manage-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.doc-manage-list li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--row-hover); border-radius: 10px;
+  border: 1px solid transparent;
+}
+.doc-manage-list li.is-current { border-color: rgba(139,92,246,.4); }
+.doc-manage-list .doc-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.doc-manage-list .doc-info b { font-size: 13px; }
+.doc-manage-list .doc-info small { font-size: 11px; color: var(--muted); }
+.doc-manage-list .doc-mgmt-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.doc-manage-list .doc-mgmt-actions button {
+  background: transparent; color: var(--muted);
+  font-size: 11px; padding: 4px 8px; border-radius: 6px;
+}
+.doc-manage-list .doc-mgmt-actions button:hover { color: var(--fg); background: var(--card-bg); }
+
 /* ===== Connection (online/offline) dot in header ===== */
 .conn-dot {
   display: inline-block;

@@ -1,42 +1,16 @@
-"""Encrypted SQLite store. The encryption key lives in the OS keyring
-(macOS Keychain / libsecret / Windows Credential Manager), not on disk. This
-means:
+"""Encrypted SQLite store, multi-document aware.
 
-- No password prompt: app auto-unlocks at start using the same OS user's
-  Keychain.
-- The encrypted `mycal.db` file alone is useless — without the corresponding
-  Keychain entry, sqlite3 can't open it (`file is not a database`).
-- If you log into a different macOS user account, you can't access the data.
-- The Keychain entry is gated by macOS login password / FileVault.
+The currently active document is determined by `docs.current_doc()`. Its
+SQLCipher key lives in the system Keychain. Switching documents tears down
+the active connection and opens the next one.
 """
-import os
-import secrets
-import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-import keyring
 import sqlcipher3 as sqlite3  # API-compatible with stdlib sqlite3
 
-
-# ---------- data dir ----------
-
-def _default_data_dir() -> Path:
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "mycal"
-    if sys.platform.startswith("win"):
-        base = os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
-        return Path(base) / "mycal"
-    base = os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share")
-    return Path(base) / "mycal"
-
-
-DATA_DIR = Path(os.environ.get("MYCAL_DATA_DIR")).expanduser() if os.environ.get("MYCAL_DATA_DIR") else _default_data_dir()
-DB_PATH = DATA_DIR / "mycal.db"
-
-# Keychain coordinates
-KEYRING_SERVICE = "mycal"
-KEYRING_USERNAME = "db-encryption-key"
+from . import docs
+from .paths import DATA_DIR
 
 
 # ---------- schema ----------
@@ -76,9 +50,6 @@ CREATE TABLE IF NOT EXISTS import_logs (
     imported_at     TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
--- Monthly budget configuration. One row per category — the "default" budget
--- that applies to every month unless an override exists. The pseudo-category
--- "_total" represents the overall monthly budget.
 CREATE TABLE IF NOT EXISTS budgets (
     category   TEXT PRIMARY KEY,
     amount     REAL NOT NULL CHECK (amount >= 0),
@@ -86,13 +57,9 @@ CREATE TABLE IF NOT EXISTS budgets (
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
--- Per-month override of a budget for a specific (category, period). When
--- present this takes precedence over the default in `budgets`. Allows
--- short-term changes (vacation month, salary bump, etc.) without losing the
--- baseline default.
 CREATE TABLE IF NOT EXISTS budget_overrides (
     category   TEXT NOT NULL,
-    period     TEXT NOT NULL,                       -- YYYY-MM
+    period     TEXT NOT NULL,
     amount     REAL NOT NULL CHECK (amount >= 0),
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
@@ -102,79 +69,84 @@ CREATE INDEX IF NOT EXISTS idx_bg_overrides_period ON budget_overrides(period);
 """
 
 
-# ---------- key management ----------
-
-def _get_or_create_key() -> str:
-    """Read the encryption key from the OS keyring. Creates a fresh random
-    key on first run."""
-    key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
-    if key:
-        return key
-    key = secrets.token_urlsafe(48)  # ≥ 256 bits of entropy
-    keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, key)
-    return key
-
-
-# ---------- connection ----------
+# ---------- connection state ----------
 
 _conn: sqlite3.Connection | None = None
+_open_doc_id: str | None = None
 
 
-def open_db() -> None:
-    """Open (and lazily create) the encrypted database. Idempotent. Called
-    once at app startup from `app.py:create_app`."""
-    global _conn
-    if _conn is not None:
-        return
+def _open_for(doc: dict) -> sqlite3.Connection:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    key = _get_or_create_key()
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    db_path = DATA_DIR / doc["file"]
+    key = docs.get_key_for(doc)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    # PRAGMA key must precede any other statement on a SQLCipher connection.
     safe = key.replace("'", "''")
     conn.execute(f"PRAGMA key = '{safe}'")
-    # Verify the key matches an existing db, or create schema for a new one.
     try:
         conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
     except sqlite3.DatabaseError as e:
-        # Keychain entry doesn't match the db on disk. Most likely: the user
-        # cleared Keychain or copied a db from another machine. Bail loudly.
+        conn.close()
         raise RuntimeError(
-            f"无法打开加密数据库: {e}. 可能原因: Keychain 中的密钥与 "
-            f"{DB_PATH} 不匹配。如要重置，请删除 db 文件并重新启动。"
+            f"无法打开加密数据库 {db_path.name}: {e}. "
+            "Keychain 中的密钥可能与该 db 文件不匹配。"
         ) from e
     conn.executescript(SCHEMA)
     conn.commit()
-    _conn = conn
+    return conn
 
 
-def close_db() -> None:
-    global _conn
+def open_db() -> None:
+    """Open (or re-open) the currently-active document. Idempotent — calling
+    when the same doc is already open is a no-op."""
+    global _conn, _open_doc_id
+    doc = docs.current_doc() or docs.ensure_default_exists()
+    if _conn is not None and _open_doc_id == doc["id"]:
+        return
     if _conn is not None:
         try:
             _conn.close()
         finally:
             _conn = None
+    _conn = _open_for(doc)
+    _open_doc_id = doc["id"]
 
 
-def reset_all() -> None:
-    """Destructive: delete the db file AND the Keychain key. Next start of the
-    app will create a brand-new empty encrypted db with a fresh key."""
+def close_db() -> None:
+    global _conn, _open_doc_id
+    if _conn is not None:
+        try:
+            _conn.close()
+        finally:
+            _conn = None
+    _open_doc_id = None
+
+
+def reload_for_active_doc() -> dict:
+    """Called by routes after `docs.switch_doc()` to bring the connection up
+    to date. Returns the new active doc."""
     close_db()
-    try:
-        DB_PATH.unlink()
-    except FileNotFoundError:
-        pass
-    try:
-        keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
-    except keyring.errors.PasswordDeleteError:
-        pass
+    open_db()
+    return docs.current_doc()
+
+
+def reset_active() -> None:
+    """Nuke the active document's db file (Keychain key stays — file recreated
+    next time and re-encrypts under the same key)."""
+    global _conn, _open_doc_id
+    doc = docs.current_doc()
+    close_db()
+    if doc:
+        try:
+            (DATA_DIR / doc["file"]).unlink()
+        except FileNotFoundError:
+            pass
 
 
 @contextmanager
 def get_conn():
     if _conn is None:
-        open_db()  # lazy fallback in case caller forgot
+        open_db()
     try:
         yield _conn
         _conn.commit()
@@ -183,6 +155,14 @@ def get_conn():
         raise
 
 
-# Back-compat shim for old callers.
-def init_db() -> None:
+# ---------- back-compat ----------
+
+def init_db() -> None:  # used by older callers; no-op now
     open_db()
+
+
+# Convenience: expose the active db file path (used by /api/admin)
+@property
+def DB_PATH() -> Path:
+    doc = docs.current_doc()
+    return DATA_DIR / doc["file"] if doc else DATA_DIR / "no-doc.db"

@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__, db
 from .categorizer import ALL_CATEGORIES, CATEGORY_COLORS
-from .routes import budgets, imports, summary, transactions
+from .routes import budgets, documents, imports, summary, transactions
 
 
 def _web_dir() -> Path:
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(summary.router)
     app.include_router(imports.router)
     app.include_router(budgets.router)
+    app.include_router(documents.router)
 
     @app.get("/api/meta")
     def meta():
@@ -48,10 +49,11 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/admin/reset")
-    def reset_all():
-        """Destroy everything: db file + Keychain key. Use with caution.
-        Next request re-creates an empty encrypted db with a fresh key."""
-        db.reset_all()
+    def reset_active_document():
+        """Empty the active document (delete + recreate its db file).
+        Other documents are untouched. The Keychain key is preserved so the
+        re-created file is encrypted under the same key."""
+        db.reset_active()
         return {"ok": True}
 
     app.mount("/", NoCacheStatic(directory=WEB_DIR, html=True), name="web")

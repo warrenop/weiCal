@@ -10,7 +10,7 @@
  * cache during the `activate` step.
  */
 
-const VERSION = 'mycal-v0.5.2';
+const VERSION = 'mycal-v0.6.0';
 // Same-origin shell — precache eagerly on install.
 // CDN bundles (Tailwind, ECharts) are large + may serve opaque cross-origin
 // responses; they are cached lazily by the fetch handler on first request.
@@ -60,6 +60,27 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname === '/sw.js') return;
 
   const isAPI = url.pathname.startsWith('/api/');
+  const isNavigation = req.mode === 'navigate';
+
+  // Navigation requests (index.html) use network-first so app updates land
+  // immediately when online. Falls back to cached shell if offline.
+  if (isNavigation) {
+    event.respondWith((async () => {
+      try {
+        const resp = await fetch(req);
+        if (resp.ok) {
+          const cache = await caches.open(VERSION);
+          cache.put(req, resp.clone()).catch(() => {});
+        }
+        return resp;
+      } catch (e) {
+        const cached = await caches.match(req) || await caches.match('/');
+        if (cached) return cached;
+        throw e;
+      }
+    })());
+    return;
+  }
 
   if (isAPI) {
     // Network-first with cache fallback

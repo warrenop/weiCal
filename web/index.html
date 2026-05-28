@@ -41,6 +41,17 @@
     <div class="text-xl font-bold flex items-center gap-2 select-none brand">
       <img src="/logo.svg" alt="" class="brand-logo" width="34" height="34">
       <span class="brand-name">微记账本</span>
+      <button id="doc-switcher" class="doc-switcher" title="切换 / 管理文档">
+        <span id="doc-current-name" class="doc-current">默认</span>
+        <svg viewBox="0 0 20 20" fill="currentColor" class="doc-caret"><path d="M5 8l5 5 5-5H5z"/></svg>
+      </button>
+      <div id="doc-menu" class="doc-menu hidden">
+        <div class="doc-menu-head">切换文档</div>
+        <ul id="doc-list"></ul>
+        <div class="doc-menu-divider"></div>
+        <button id="doc-new" class="doc-menu-item">＋ 新建文档</button>
+        <button id="doc-manage" class="doc-menu-item">⚙️ 管理…</button>
+      </div>
     </div>
     <nav class="flex gap-1 ml-4">
       <button data-view="overview" class="nav-btn">总览</button>
@@ -355,6 +366,36 @@
 </div>
 
 <div id="toast" class="fixed bottom-6 right-6 hidden bg-[var(--toast-bg)] text-[var(--toast-fg)] text-sm px-4 py-2 rounded-md shadow-lg backdrop-blur"></div>
+
+<!-- 文档管理弹窗 -->
+<div id="modal-docs" class="modal hidden">
+  <div class="modal-box" style="max-width: 28rem;">
+    <h2 class="text-lg font-bold mb-1">管理文档</h2>
+    <p class="text-sm text-[var(--muted)] mb-4">
+      每个文档是独立的加密数据库；切换 = 切换全部账单数据。
+    </p>
+    <ul id="doc-manage-list" class="doc-manage-list"></ul>
+    <div class="flex justify-between items-center mt-4">
+      <button id="doc-new-2" class="btn-success">＋ 新建文档</button>
+      <button class="modal-close btn-ghost">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建文档弹窗 -->
+<div id="modal-doc-new" class="modal hidden">
+  <div class="modal-box" style="max-width: 22rem;">
+    <h2 class="text-lg font-bold mb-1">新建文档</h2>
+    <p class="text-sm text-[var(--muted)] mb-3">新文档为空，需要重新导入账单或手动添加。</p>
+    <label class="block text-xs text-[var(--muted)] mb-1">名称</label>
+    <input id="doc-new-name" type="text" class="select w-full mb-3" placeholder="如：家庭账 / 工作账">
+    <div id="doc-new-error" class="text-sm text-rose-500 mb-2 hidden"></div>
+    <div class="flex justify-end gap-2">
+      <button class="modal-close btn-ghost">取消</button>
+      <button id="doc-new-create" class="btn-primary">创建并切换</button>
+    </div>
+  </div>
+</div>
 
 <!-- 预算编辑弹窗 -->
 <div id="modal-budget" class="modal hidden">

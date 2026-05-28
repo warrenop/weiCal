@@ -976,6 +976,159 @@ async function renderIncome() {
 
 $('#inc-year').addEventListener?.('change', renderIncome);
 
+// ---------- documents (multi-account) ----------
+state.docs = { current_id: null, items: [] };
+
+async function refreshDocs() {
+  state.docs = await api('/api/documents');
+  const cur = state.docs.items.find(d => d.id === state.docs.current_id);
+  $('#doc-current-name').textContent = cur ? cur.name : '—';
+  // Render dropdown list
+  const ul = $('#doc-list');
+  ul.innerHTML = '';
+  for (const d of state.docs.items) {
+    const li = document.createElement('li');
+    if (d.id === state.docs.current_id) li.classList.add('is-current');
+    li.textContent = d.name;
+    li.onclick = async () => {
+      if (d.id === state.docs.current_id) { closeDocMenu(); return; }
+      await switchDoc(d.id);
+    };
+    ul.appendChild(li);
+  }
+}
+
+async function switchDoc(doc_id) {
+  closeDocMenu();
+  toast('正在切换…');
+  await api(`/api/documents/${doc_id}/open`, { method: 'POST' });
+  // Drop all cached UI state and restart the bootstrap path
+  await refreshDocs();
+  // Reset client state related to dataset
+  state.periods = [];
+  state.charts = {};        // discard chart instances; new view will rebuild
+  await refreshPeriods();
+  await refreshSyncStatus();
+  refreshKpiBudgetBadge();
+  // Pick smart starting month
+  const now = new Date();
+  state.year = now.getFullYear();
+  state.month = now.getMonth() + 1;
+  if (hasAnyData()) {
+    const target = `${state.year}-${String(state.month).padStart(2,'0')}`;
+    if (!state.periods.includes(target)) {
+      const n = nearestPeriod(state.year, state.month);
+      if (n) { const [y,m] = n.split('-').map(Number); state.year=y; state.month=m; }
+    }
+    // sync selectors
+    $('#period-year').value = state.year;
+    $('#period-month').value = state.month;
+    showView('overview');
+    toast(`已切换到「${state.docs.items.find(d=>d.id===doc_id).name}」`);
+  } else {
+    showWelcome();
+    toast(`已切换到「${state.docs.items.find(d=>d.id===doc_id).name}」(空文档)`);
+  }
+}
+
+function openDocMenu()  { $('#doc-menu').classList.remove('hidden'); }
+function closeDocMenu() { $('#doc-menu').classList.add('hidden'); }
+$('#doc-switcher').onclick = (e) => {
+  e.stopPropagation();
+  $('#doc-menu').classList.toggle('hidden');
+};
+document.addEventListener('click', (e) => {
+  if (!$('#doc-menu').contains(e.target) && !$('#doc-switcher').contains(e.target)) {
+    closeDocMenu();
+  }
+});
+
+$('#doc-new').onclick = () => { closeDocMenu(); openDocNewModal(); };
+$('#doc-new-2')?.addEventListener('click', () => { closeModal('modal-docs'); openDocNewModal(); });
+$('#doc-manage').onclick = () => { closeDocMenu(); openDocManageModal(); };
+
+function openDocNewModal() {
+  $('#doc-new-name').value = '';
+  $('#doc-new-error').classList.add('hidden');
+  openModal('modal-doc-new');
+  setTimeout(() => $('#doc-new-name').focus(), 80);
+}
+
+$('#doc-new-create').onclick = async () => {
+  const name = $('#doc-new-name').value.trim();
+  if (!name) {
+    const e = $('#doc-new-error'); e.textContent='请输入名称'; e.classList.remove('hidden'); return;
+  }
+  try {
+    const d = await api('/api/documents', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name }),
+    });
+    closeModal('modal-doc-new');
+    await switchDoc(d.id);
+  } catch (e) {
+    const el = $('#doc-new-error'); el.textContent = e.message; el.classList.remove('hidden');
+  }
+};
+
+async function openDocManageModal() {
+  await refreshDocs();
+  const ul = $('#doc-manage-list');
+  ul.innerHTML = '';
+  for (const d of state.docs.items) {
+    const li = document.createElement('li');
+    if (d.id === state.docs.current_id) li.classList.add('is-current');
+    const created = d.created_at ? d.created_at.slice(0, 10) : '';
+    li.innerHTML = `
+      <div class="doc-info">
+        <b>${escapeHtml(d.name)}${d.id === state.docs.current_id ? ' · 当前' : ''}</b>
+        <small>创建于 ${created}</small>
+      </div>
+      <div class="doc-mgmt-actions">
+        <button data-act="open"   data-id="${d.id}">切换</button>
+        <button data-act="rename" data-id="${d.id}" data-name="${escapeHtml(d.name)}">改名</button>
+        <button data-act="del"    data-id="${d.id}" data-name="${escapeHtml(d.name)}">删除</button>
+      </div>`;
+    ul.appendChild(li);
+  }
+  ul.querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = async () => {
+      const id = b.dataset.id, act = b.dataset.act, name = b.dataset.name;
+      if (act === 'open') {
+        closeModal('modal-docs');
+        await switchDoc(id);
+      } else if (act === 'rename') {
+        const v = prompt('新名称', name);
+        if (!v || !v.trim() || v.trim() === name) return;
+        try {
+          await api(`/api/documents/${id}`, {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ name: v.trim() }),
+          });
+          toast('已改名');
+          openDocManageModal();
+        } catch (e) { toast('改名失败：'+e.message); }
+      } else if (act === 'del') {
+        if (state.docs.items.length === 1) { toast('至少保留一个文档'); return; }
+        if (!confirm(`确认删除「${name}」？\n该文档的全部账单与预算会永久消失，无法恢复。`)) return;
+        const second = prompt(`再次确认：输入「${name}」以删除`, '');
+        if (second !== name) { toast('未删除'); return; }
+        try {
+          await api(`/api/documents/${id}`, { method: 'DELETE' });
+          toast('已删除');
+          await refreshDocs();
+          openDocManageModal();
+          // If the deleted one was current, the server already promoted another
+          if (id === state.docs.current_id) {
+            // unlikely (current_id updates), but rerender just in case
+          }
+        } catch (e) { toast('删除失败：'+e.message); }
+      }
+    };
+  });
+  openModal('modal-docs');
+}
+
 // ---------- update check (Github Releases) ----------
 function cmpVersion(a, b) {
   const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
@@ -1053,6 +1206,7 @@ function showUpdateToast(latest, repo, current, htmlUrl) {
   $('#period-year').addEventListener('change', e => { state.year = +e.target.value; renderOverview(); });
   $('#period-month').addEventListener('change', e => { state.month = +e.target.value; renderOverview(); });
 
+  await refreshDocs();
   await refreshPeriods();
   if (!hasAnyData()) {
     showWelcome();

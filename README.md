@@ -52,6 +52,12 @@
 
 ![Tour spotlight](docs/screenshots/07-tour-spotlight.png)
 
+### 多文档（多账户）— 个人 / 家庭 / 工作各一份独立加密库
+
+| 下拉切换 | 集中管理 |
+|---|---|
+| ![Doc switcher](docs/screenshots/13-doc-switcher.png) | ![Doc manage](docs/screenshots/14-doc-manage.png) |
+
 ### 应用内更新提示（启动时检查 Github Releases，每 24h 一次）
 
 ![Update notifier](docs/screenshots/08-update-toast.png)
@@ -77,6 +83,7 @@
 ## 功能
 
 - **微信账单导入**：CSV / xlsx 自动解析，按交易单号去重，关键字自动分类（餐饮 / 交通 / 购物 / 生活缴费 / 娱乐 / 医疗 / 教育 / 转账 / 理财 / 收入 / 其它）
+- **多文档支持**：一台 mycal 内开任意多本账（个人/家庭/工作/夫妻分账…），每本**独立加密库 + 独立 Keychain 密钥**。头部下拉一秒切换
 - **6 个视图**：总览 / 明细 / 分类 / **预算** / 收入 / 导入历史
 - **预算管理**：按分类（含总预算）设月度默认上限 + 单月覆盖（旅行月调高不影响其它月），超 70% 黄色提醒，超 100% 红色超支提醒；总览页自动浮徽章
 - **可视化**：KPI 卡片 + 每日柱图 + 分类环形图 + Top 商户 + 月度现金流 + 收入来源玫瑰图
@@ -98,9 +105,11 @@
 
 | OS | 路径 |
 |---|---|
-| macOS | `~/Library/Application Support/mycal/mycal.db` |
-| Linux | `$XDG_DATA_HOME/mycal/mycal.db`（默认 `~/.local/share/mycal/`） |
-| Windows | `%LOCALAPPDATA%\mycal\mycal.db` |
+| macOS | `~/Library/Application Support/mycal/{documents.json, *.db}` |
+| Linux | `$XDG_DATA_HOME/mycal/{documents.json, *.db}`（默认 `~/.local/share/mycal/`） |
+| Windows | `%LOCALAPPDATA%\mycal\{documents.json, *.db}` |
+
+> 0.6.0 起每个**文档**对应一个独立 `<id>.db` 文件 + 一个 Keychain key。`documents.json` 是注册表（id / name / file 映射）。升级老用户时旧 `mycal.db` 会自动迁移成名为「默认」的文档。
 
 环境变量 `MYCAL_DATA_DIR` 可覆盖（多设备同步、外置盘等）：
 
@@ -296,7 +305,7 @@ weiCal/
 - [ ] 给 .app 做 Apple Developer 代码签名（取消 Gatekeeper 右键开）
 - [x] PWA 端 service worker 离线缓存（v0.5.2+）
 - [x] 预算 / 提醒（v0.5.0+）
-- [ ] 多账户支持（夫妻 / 室友各自加密库）
+- [x] 多账户 = 多文档（v0.6.0+，每份独立加密库 + Keychain key）
 - [x] 应用内更新提示（v0.4.3+）
 
 ---
