@@ -106,16 +106,19 @@
 
       <ol class="welcome-steps">
         <li><span class="step-num">1</span>
-          <div>在微信里申请账单：<b>我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单</b>，按月申请</div></li>
+          <div>申请账单：
+            <b>微信</b> 我→服务→钱包→账单→常见问题→下载账单；
+            <b>支付宝</b> 我→账单→⚙️→开具交易流水证明
+          </div></li>
         <li><span class="step-num">2</span>
           <div>邮件收到 zip，解压得到 <code>.csv</code> 或 <code>.xlsx</code> 文件</div></li>
         <li><span class="step-num">3</span>
-          <div>点下方按钮上传，分类与图表会自动生成</div></li>
+          <div>点下方按钮上传，**自动识别来源**，分类与图表会自动生成</div></li>
       </ol>
 
       <div class="welcome-cta">
         <button id="btn-welcome-import" class="btn-primary btn-large">
-          <span class="mr-1">📤</span> 导入账单 (CSV / xlsx)
+          <span class="mr-1">📤</span> 导入账单（微信 / 支付宝）
         </button>
         <button id="btn-welcome-manual" class="btn-ghost">
           <span class="mr-1">✍️</span> 先手动添加一条
@@ -322,9 +325,11 @@
 <!-- 上传弹窗 -->
 <div id="modal-upload" class="modal hidden">
   <div class="modal-box">
-    <h2 class="text-lg font-bold mb-1">导入微信账单</h2>
+    <h2 class="text-lg font-bold mb-1">导入账单</h2>
     <p class="text-sm text-[var(--muted)] mb-4">
-      微信 → 我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单（按月申请，邮件收到解压得到 .csv 或 .xlsx）
+      支持<b>微信</b>和<b>支付宝</b>官方账单 CSV / xlsx，自动识别来源。<br>
+      • 微信：我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单<br>
+      • 支付宝：我 → 账单 → 右上角 ⚙️ → 开具交易流水证明 → 用于个人对账
     </p>
     <input id="csv-file" type="file" accept=".csv,.xlsx,.xlsm" class="mb-4 block w-full text-sm">
     <div id="upload-progress" class="hidden mb-3">

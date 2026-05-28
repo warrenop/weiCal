@@ -1,6 +1,6 @@
 [project]
 name = "mycal"
-version = "0.6.0"
+version = "0.6.1"
 description = "微记账本 — 本地加密的微信账单可视化记账"
 requires-python = ">=3.10"
 dependencies = [

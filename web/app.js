@@ -488,11 +488,12 @@ $('#btn-upload').onclick = async () => {
     $('#upload-bar').style.width = '100%';
     $('#upload-stage').textContent = '✓ 导入完成';
     $('#upload-percent').textContent = '';
+    const sourceLabel = { wechat: '微信账单', alipay: '支付宝账单' }[r.source] || '账单';
     $('#upload-result').innerHTML =
-      `<span class="text-emerald-700 font-medium">导入完成</span>：新增 ${r.inserted} 条，跳过重复 ${r.skipped} 条`
+      `<span class="text-emerald-700 font-medium">${sourceLabel}导入完成</span>：新增 ${r.inserted} 条，跳过重复 ${r.skipped} 条`
       + (r.failed ? `，失败 ${r.failed} 条` : '')
       + (r.period_start ? `<br>区间：${r.period_start} ~ ${r.period_end}` : '');
-    toast(`导入完成：+${r.inserted} 新增 / ${r.skipped} 重复`, 3500);
+    toast(`${sourceLabel}：+${r.inserted} 新增 / ${r.skipped} 重复`, 3500);
 
     await refreshPeriods();
     await refreshSyncStatus();

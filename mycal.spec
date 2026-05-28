@@ -79,8 +79,8 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleDisplayName": "微记账本",
             "CFBundleName": "微记账本",
-            "CFBundleShortVersionString": "0.6.0",
-            "CFBundleVersion": "0.6.0",
+            "CFBundleShortVersionString": "0.6.1",
+            "CFBundleVersion": "0.6.1",
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "11.0",
             "NSHumanReadableCopyright": "Copyright © 2026 mycal",

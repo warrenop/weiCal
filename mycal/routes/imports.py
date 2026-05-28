@@ -1,21 +1,31 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from datetime import datetime
 from ..db import get_conn
-from ..importer import import_wechat_csv
+from ..importer import import_bill
 
 router = APIRouter(prefix="/api/imports", tags=["imports"])
 
 
-@router.post("/wechat")
-async def upload_wechat(file: UploadFile = File(...)):
+async def _do_upload(file: UploadFile) -> dict:
     raw = await file.read()
     if not raw:
         raise HTTPException(400, "empty file")
     try:
-        result = import_wechat_csv(raw, file.filename or "upload.csv")
+        return import_bill(raw, file.filename or "upload.csv")
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return result
+
+
+@router.post("/bill")
+async def upload_bill(file: UploadFile = File(...)):
+    """Auto-detects WeChat / Alipay bill format and imports."""
+    return await _do_upload(file)
+
+
+@router.post("/wechat")
+async def upload_wechat_compat(file: UploadFile = File(...)):
+    """Backward-compat alias; same auto-detection as /bill."""
+    return await _do_upload(file)
 
 
 @router.get("/status")

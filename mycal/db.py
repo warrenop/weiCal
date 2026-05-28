@@ -92,6 +92,12 @@ def _open_for(doc: dict) -> sqlite3.Connection:
             "Keychain 中的密钥可能与该 db 文件不匹配。"
         ) from e
     conn.executescript(SCHEMA)
+    # Backfill: import_logs.source column was added in 0.6.1; ALTER fails
+    # if the column already exists, which is fine.
+    try:
+        conn.execute("ALTER TABLE import_logs ADD COLUMN source TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     return conn
 
