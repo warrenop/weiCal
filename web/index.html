@@ -64,13 +64,22 @@
     <div class="ml-auto flex items-center gap-3">
       <span id="conn-dot" class="conn-dot is-online" title="在线"></span>
       <span id="sync-status" class="text-xs text-[var(--muted)]"></span>
-      <button id="btn-tour" class="theme-toggle" aria-label="重新开始向导" title="重新开始向导">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M9.5 9a2.5 2.5 0 1 1 4.6 1.4c-1 .9-1.6 1.4-1.6 2.6"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </button>
+      <div class="help-wrap">
+        <button id="btn-help" class="theme-toggle" aria-label="帮助 / 关于" title="帮助 / 关于">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.5 9a2.5 2.5 0 1 1 4.6 1.4c-1 .9-1.6 1.4-1.6 2.6"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </button>
+        <div id="help-menu" class="doc-menu hidden" style="right:0; left:auto;">
+          <div class="doc-menu-head">帮助 / 关于</div>
+          <button id="help-tour" class="doc-menu-item">🧭 重新开始向导</button>
+          <button id="help-update" class="doc-menu-item">🔄 检查更新</button>
+          <div class="doc-menu-divider"></div>
+          <div class="help-version">微记账本 <span id="help-version-num">—</span></div>
+        </div>
+      </div>
       <button id="btn-theme" class="theme-toggle" aria-label="切换深浅模式">
         <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="4"/>

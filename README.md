@@ -58,9 +58,11 @@
 |---|---|
 | ![Doc switcher](docs/screenshots/13-doc-switcher.png) | ![Doc manage](docs/screenshots/14-doc-manage.png) |
 
-### 应用内更新提示（启动时检查 Github Releases，每 24h 一次）
+### 手动检查更新（头部「?」帮助菜单 → 检查更新）
 
-![Update notifier](docs/screenshots/08-update-toast.png)
+零打扰：不自动弹窗。点头部「?」→「检查更新」才查 Github Releases；有新版弹下载提示，已是最新则提示「已是最新版本」。
+
+![Help menu](docs/screenshots/18-help-menu.png)
 
 ### 预算 / 提醒（按分类设月预算，超 70% 黄、超 100% 红）
 
@@ -354,7 +356,7 @@ weiCal/
 - [x] PWA 端 service worker 离线缓存（v0.5.2+）
 - [x] 预算 / 提醒（v0.5.0+）
 - [x] 多账户 = 多文档（v0.6.0+，每份独立加密库 + Keychain key）
-- [x] 应用内更新提示（v0.4.3+）
+- [x] 更新检查（v0.4.3 自动 → v0.6.4 改为手动「检查更新」，零打扰）
 
 ---
 

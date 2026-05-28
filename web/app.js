@@ -1228,7 +1228,7 @@ async function openDocManageModal() {
   openModal('modal-docs');
 }
 
-// ---------- update check (Github Releases) ----------
+// ---------- help menu + manual update check ----------
 function cmpVersion(a, b) {
   const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
   const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
@@ -1239,60 +1239,65 @@ function cmpVersion(a, b) {
   return 0;
 }
 
-async function checkForUpdates() {
+// Help / about menu toggle
+$('#btn-help').onclick = (e) => {
+  e.stopPropagation();
+  $('#help-menu').classList.toggle('hidden');
+};
+document.addEventListener('click', (e) => {
+  if (!$('#help-menu').contains(e.target) && !$('#btn-help').contains(e.target)) {
+    $('#help-menu').classList.add('hidden');
+  }
+});
+$('#help-tour').onclick = () => {
+  $('#help-menu').classList.add('hidden');
+  if (typeof window.startTour === 'function') window.startTour();
+};
+$('#help-update').onclick = () => {
+  $('#help-menu').classList.add('hidden');
+  manualCheckUpdate();
+};
+
+// Manual, on-demand update check — no auto-trigger, no throttle, no nagging.
+let _checkingUpdate = false;
+async function manualCheckUpdate() {
+  if (_checkingUpdate) return;
   const current = state.meta.version;
   const repo = state.meta.repo;
-  if (!current || !repo) return;
+  if (!current || !repo) { toast('无法获取版本信息'); return; }
 
-  // Throttle: max once per 24h
-  const LAST_KEY = 'mycal-update-last-check';
-  const DISMISS_KEY = 'mycal-update-dismissed';
-  const last = +(localStorage.getItem(LAST_KEY) || 0);
-  if (Date.now() - last < 24 * 3600 * 1000) {
-    // Still re-show toast if a cached newer version exists and is undismissed
-    const cached = localStorage.getItem('mycal-update-latest');
-    if (cached && cmpVersion(cached, current) > 0
-        && localStorage.getItem(DISMISS_KEY) !== cached) {
-      showUpdateToast(cached, repo, current);
-    }
-    return;
-  }
-
+  _checkingUpdate = true;
+  toast('正在检查更新…', 1500);
   try {
     const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
       headers: { Accept: 'application/vnd.github+json' },
     });
-    if (!r.ok) return;
+    if (!r.ok) throw new Error('api');
     const data = await r.json();
     const latest = String(data.tag_name || '').replace(/^v/, '');
-    if (!latest) return;
+    if (!latest) throw new Error('no-tag');
 
-    localStorage.setItem(LAST_KEY, String(Date.now()));
-    localStorage.setItem('mycal-update-latest', latest);
-
-    if (cmpVersion(latest, current) <= 0) return;
-    if (localStorage.getItem(DISMISS_KEY) === latest) return;
-
-    showUpdateToast(latest, repo, current, data.html_url);
+    if (cmpVersion(latest, current) > 0) {
+      // Newer available → show the gradient toast with a download link
+      $('#ut-version').textContent = 'v' + latest;
+      $('#ut-current').textContent = `(当前 v${current})`;
+      $('#ut-link').href = data.html_url || `https://github.com/${repo}/releases/tag/v${latest}`;
+      $('#update-toast').classList.remove('hidden');
+      $('#ut-dismiss').onclick = () => $('#update-toast').classList.add('hidden');
+    } else {
+      toast(`已是最新版本 v${current}`, 3000);
+    }
   } catch (e) {
-    // Offline or rate-limited — silently ignore
+    toast('检查更新失败，请稍后重试', 3000);
+  } finally {
+    _checkingUpdate = false;
   }
-}
-
-function showUpdateToast(latest, repo, current, htmlUrl) {
-  $('#ut-version').textContent = 'v' + latest;
-  $('#ut-current').textContent = `(当前 v${current})`;
-  $('#ut-link').href = htmlUrl || `https://github.com/${repo}/releases/tag/v${latest}`;
-  $('#update-toast').classList.remove('hidden');
-  $('#ut-dismiss').onclick = () => {
-    localStorage.setItem('mycal-update-dismissed', latest);
-    $('#update-toast').classList.add('hidden');
-  };
 }
 
 // ---------- bootstrap ----------
 (async function init() {
   state.meta = await api('/api/meta');
+  if (state.meta.version) $('#help-version-num').textContent = 'v' + state.meta.version;
   fillYearMonth($('#period-year'), $('#period-month'), state.year, state.month);
   fillYearMonth($('#f-year'), $('#f-month'), state.year, state.month);
   fillYearMonth($('#cat-year'), $('#cat-month'), state.year, state.month);
@@ -1310,7 +1315,6 @@ function showUpdateToast(latest, repo, current, htmlUrl) {
   if (!hasAnyData()) {
     showWelcome();
     await refreshSyncStatus();   // keeps "尚未导入" label honest
-    setTimeout(checkForUpdates, 1500);
     return;
   }
   // If the current month has no data, jump to the most recent month that does.
@@ -1327,6 +1331,4 @@ function showUpdateToast(latest, repo, current, htmlUrl) {
   showView('overview');
   await refreshSyncStatus();
   refreshKpiBudgetBadge();      // non-blocking
-  // Fire update check after main UI is ready; non-blocking
-  setTimeout(checkForUpdates, 1500);
 })();

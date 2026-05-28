@@ -132,7 +132,7 @@
   };
 
   document.addEventListener('DOMContentLoaded', () => {
-    $('#btn-tour').onclick = start;
+    // Tour is launched from the help menu (app.js wires #help-tour → window.startTour)
     $('#tour-next').onclick = next;
     $('#tour-prev').onclick = prev;
     $('#tour-skip').onclick = hide;

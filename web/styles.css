@@ -546,6 +546,14 @@ html.dark .wiz-parse.is-err { color: #fb7185; }
 }
 .doc-manage-list .doc-mgmt-actions button:hover { color: var(--fg); background: var(--card-bg); }
 
+/* ===== Help / about menu ===== */
+.help-wrap { position: relative; display: inline-flex; }
+.help-version {
+  font-size: 11px; color: var(--muted);
+  padding: 4px 10px 2px;
+}
+.help-version span { color: var(--fg); font-weight: 600; }
+
 /* ===== Connection (online/offline) dot in header ===== */
 .conn-dot {
   display: inline-block;
@@ -565,6 +573,10 @@ html.dark .wiz-parse.is-err { color: #fb7185; }
 }
 
 /* ===== App-update toast ===== */
+/* The ID selector below sets display:flex; a plain `.hidden` (class, lower
+   specificity) can't override it — so hiding needs this higher-specificity
+   rule. Without it the toast is permanently visible (the original bug). */
+#update-toast.hidden { display: none !important; }
 #update-toast {
   position: fixed; left: 50%; bottom: 28px;
   transform: translateX(-50%);
