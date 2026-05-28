@@ -29,6 +29,7 @@ an existing `mycal.db` + the old keychain entry `db-encryption-key`. It
 registers that as a "legacy" document so nothing is lost.
 """
 import json
+import os
 import secrets
 import uuid
 from datetime import datetime
@@ -43,6 +44,59 @@ from .paths import DATA_DIR, DOCS_REGISTRY
 KEYRING_SERVICE = "mycal"
 LEGACY_KEYCHAIN_NAME = "db-encryption-key"   # what v<0.6 used
 LEGACY_DB_FILENAME = "mycal.db"
+KEY_FALLBACK_DIR = DATA_DIR / "keys"
+
+
+# ---------- key storage (system keyring with file fallback) ----------
+#
+# Prefer the OS keychain (macOS Keychain / Windows Credential Manager / Linux
+# Secret Service). But on headless Linux — servers, minimal installs, CI — no
+# Secret Service / D-Bus session exists and `keyring` raises. In that case we
+# fall back to a 0600 key file next to the data dir so the app still works.
+# (Less secure than the keychain, but only used when no keychain is available;
+# protect it with disk encryption / FS permissions.)
+
+def _keyfile(name: str) -> Path:
+    return KEY_FALLBACK_DIR / f"{name}.key"
+
+
+def _key_get(name: str) -> Optional[str]:
+    try:
+        v = keyring.get_password(KEYRING_SERVICE, name)
+        if v:
+            return v
+    except Exception:
+        pass
+    p = _keyfile(name)
+    if p.exists():
+        return p.read_text(encoding="utf-8").strip()
+    return None
+
+
+def _key_set(name: str, value: str) -> None:
+    try:
+        keyring.set_password(KEYRING_SERVICE, name, value)
+        return
+    except Exception:
+        pass
+    KEY_FALLBACK_DIR.mkdir(parents=True, exist_ok=True)
+    p = _keyfile(name)
+    p.write_text(value, encoding="utf-8")
+    try:
+        os.chmod(p, 0o600)
+    except OSError:
+        pass
+
+
+def _key_delete(name: str) -> None:
+    try:
+        keyring.delete_password(KEYRING_SERVICE, name)
+    except Exception:
+        pass
+    try:
+        _keyfile(name).unlink()
+    except FileNotFoundError:
+        pass
 
 
 class Document(TypedDict):
@@ -143,7 +197,7 @@ def create_doc(name: str, *, make_current: bool = True) -> Document:
     doc_id = _new_id()
     keychain_key = f"doc-{doc_id}"
     # Pre-mint the encryption key so the DB layer can pick it up
-    keyring.set_password(KEYRING_SERVICE, keychain_key, secrets.token_urlsafe(48))
+    _key_set(keychain_key, secrets.token_urlsafe(48))
 
     doc: Document = {
         "id": doc_id,
@@ -200,10 +254,7 @@ def delete_doc(doc_id: str) -> None:
         db_path.unlink()
     except FileNotFoundError:
         pass
-    try:
-        keyring.delete_password(KEYRING_SERVICE, doc["keychain_key"])
-    except keyring.errors.PasswordDeleteError:
-        pass
+    _key_delete(doc["keychain_key"])
 
     reg["documents"] = [d for d in reg["documents"] if d["id"] != doc_id]
     if reg["current"] == doc_id:
@@ -212,10 +263,11 @@ def delete_doc(doc_id: str) -> None:
 
 
 def get_key_for(doc: Document) -> str:
-    """Fetch the SQLCipher key for `doc` from keychain, minting one if missing."""
-    key = keyring.get_password(KEYRING_SERVICE, doc["keychain_key"])
+    """Fetch the SQLCipher key for `doc` from the keychain (or file fallback),
+    minting one if missing."""
+    key = _key_get(doc["keychain_key"])
     if key:
         return key
     key = secrets.token_urlsafe(48)
-    keyring.set_password(KEYRING_SERVICE, doc["keychain_key"], key)
+    _key_set(doc["keychain_key"], key)
     return key

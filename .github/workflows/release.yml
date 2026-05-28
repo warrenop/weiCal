@@ -43,27 +43,23 @@ jobs:
           python-version: '3.12'
 
       # --- Linux only: webkit2gtk runtime + GObject Introspection ---
-      # The webkit2gtk package name varies across Ubuntu releases:
-      #   24.04 (noble):  libwebkit2gtk-4.1-0  +  gir1.2-webkit2-4.1
-      #   22.04 (jammy):  libwebkit2gtk-4.0-37 +  gir1.2-webkit-4.0
-      # Try both, ignore whichever isn't available.
       - name: Install Linux system deps
         if: matrix.os == 'ubuntu-latest'
         run: |
           set -e
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            gir1.2-webkit2-4.1 \
+            libwebkit2gtk-4.1-0 \
             libgirepository1.0-dev \
+            gobject-introspection \
             libcairo2-dev \
+            python3-dev \
             pkg-config
-          # WebKit2GTK — install whichever version this Ubuntu has
-          sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-0 gir1.2-webkit2-4.1 \
-            || sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.0-37 gir1.2-webkit-4.0 \
-            || echo "neither webkit2gtk-4.1 nor 4.0 installed — Linux build will likely fail"
           python -m pip install --upgrade pip
-          pip install PyGObject pycairo
+          # PyGObject 3.50+ needs girepository-2.0 (absent on Ubuntu 24.04);
+          # pin to the last 1.0-compatible release.
+          pip install "PyGObject<3.50" pycairo
 
       - name: Install Python deps
         run: |
