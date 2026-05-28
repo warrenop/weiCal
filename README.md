@@ -18,7 +18,7 @@
 |---|---|---|
 | **macOS** (Apple Silicon) | [weiCal-macos-arm64.zip](https://github.com/warrenop/weiCal/releases/latest/download/weiCal-macos-arm64.zip) | 解压 → 拖「微记账本.app」到「应用程序」→ **首次右键 → 打开**（绕过 Gatekeeper） |
 | **Windows 10/11** | [weiCal-windows-x64.zip](https://github.com/warrenop/weiCal/releases/latest/download/weiCal-windows-x64.zip) | 解压到任意目录 → 双击 `mycal.exe` → Defender 弹窗选「仍要运行」 |
-| **Linux** | 暂未稳定 | 见 [本地构建](#本地构建可分发-app) |
+| **Linux** (x64) | [weiCal-linux-x64.tar.gz](https://github.com/warrenop/weiCal/releases/latest/download/weiCal-linux-x64.tar.gz) | 解压后 `./mycal/mycal`，需 `libwebkit2gtk-4.1-0` 运行时（GUI 模式）；headless 用 `--server` |
 | **macOS** (Intel) | 暂未发布 | 见 [本地构建](#本地构建可分发-app) |
 
 > 首次打开会自动在 `~/Library/Application Support/mycal/`（macOS）创建加密数据库，密钥写入 Keychain。
@@ -110,6 +110,8 @@
 | Windows | `%LOCALAPPDATA%\mycal\{documents.json, *.db}` |
 
 > 0.6.0 起每个**文档**对应一个独立 `<id>.db` 文件 + 一个 Keychain key。`documents.json` 是注册表（id / name / file 映射）。升级老用户时旧 `mycal.db` 会自动迁移成名为「默认」的文档。
+>
+> **密钥存储回退（0.6.3+）**：优先用系统钥匙串。若运行在无 Secret Service 的环境（headless Linux 服务器 / 最小安装 / CI），自动回退到 `<DATA_DIR>/keys/<id>.key`（0600 权限）。桌面环境永远走钥匙串，不会生成该文件。
 
 环境变量 `MYCAL_DATA_DIR` 可覆盖（多设备同步、外置盘等）：
 
@@ -265,7 +267,7 @@ python -m mycal [--server | --lan] [--port PORT]
 | macOS 12+ (Apple Silicon) | ✅ 已验证 | Release 提供 .app |
 | macOS 12+ (Intel) | ⚠️ 可本地 build | Github runner 队列紧张未自动发 |
 | Windows 10/11 | ✅ 已验证 | Release 提供 .exe |
-| Linux (GNOME/KDE) | ⚠️ 可本地 build | webkit2gtk 运行时依赖较散 |
+| Linux (x64) | ✅ 已验证 | Release 提供 tar.gz；CI smoke test 实跑二进制通过 |
 | iOS Safari | ✅ 浏览 | LAN 模式 + 加到主屏当 PWA |
 | Android Chrome | ✅ 浏览 | 同上 |
 | iOS / Android 离线 | ❌ | 需原生重写，超出范围 |
@@ -312,7 +314,7 @@ weiCal/
 
 ## Roadmap
 
-- [ ] 修 Linux CI 构建（webkit2gtk-4.1 包名 / 运行时依赖打包）
+- [x] Linux CI 构建（v0.6.3+，含 keyring 文件回退适配 headless）
 - [ ] 给 .app 做 Apple Developer 代码签名（取消 Gatekeeper 右键开）
 - [x] PWA 端 service worker 离线缓存（v0.5.2+）
 - [x] 预算 / 提醒（v0.5.0+）

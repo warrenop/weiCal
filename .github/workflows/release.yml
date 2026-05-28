@@ -28,10 +28,7 @@ jobs:
           - os: ubuntu-latest
             label: Linux x64
             asset: weiCal-linux-x64.tar.gz
-            allow_failure: true
     runs-on: ${{ matrix.os }}
-    # Linux is allow_failure — webkit2gtk packaging is fragile across distros
-    continue-on-error: ${{ matrix.allow_failure == true }}
     # Bound each job's wall-clock so a stuck runner can't block Release forever
     timeout-minutes: 30
 
