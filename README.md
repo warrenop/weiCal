@@ -145,7 +145,9 @@ python -m mycal --lan
 - iOS Safari：分享 → **添加到主屏幕**
 - Android Chrome：菜单 → **安装应用**
 
-> 数据**只在 Mac 上**，手机只是远程查看。Mac 关机/休眠手机就连不上。
+> 数据**只在 Mac 上**，手机只是远程查看。
+
+**离线缓存（v0.5.2+）**：手机端开过一次后，Service Worker 会缓存 app shell + 最近的查询结果。Mac 关机/休眠时手机仍能打开 app 看到**上次访问的数据**（只读，写操作会提示离线）。顶部小圆点显示连接状态：🟢 在线 / 🟡 离线（缓存）。
 
 ---
 
@@ -292,7 +294,7 @@ weiCal/
 
 - [ ] 修 Linux CI 构建（webkit2gtk-4.1 包名 / 运行时依赖打包）
 - [ ] 给 .app 做 Apple Developer 代码签名（取消 Gatekeeper 右键开）
-- [ ] PWA 端 service worker 离线缓存
+- [x] PWA 端 service worker 离线缓存（v0.5.2+）
 - [x] 预算 / 提醒（v0.5.0+）
 - [ ] 多账户支持（夫妻 / 室友各自加密库）
 - [x] 应用内更新提示（v0.4.3+）

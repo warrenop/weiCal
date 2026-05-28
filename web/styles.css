@@ -397,6 +397,24 @@ html.dark .bg-override-tag { color: #c4b5fd; }
 html.dark .kpi-budget-badge.is-warn { color: #fbbf24; }
 html.dark .kpi-budget-badge.is-over { color: #fb7185; }
 
+/* ===== Connection (online/offline) dot in header ===== */
+.conn-dot {
+  display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16,185,129,.5);
+  margin-right: 4px;
+  transition: background .2s, box-shadow .2s;
+}
+.conn-dot.is-offline {
+  background: #f59e0b;
+  animation: connPulse 1.4s ease-in-out infinite;
+}
+@keyframes connPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.6); }
+  50%      { box-shadow: 0 0 0 5px rgba(245,158,11,0); }
+}
+
 /* ===== App-update toast ===== */
 #update-toast {
   position: fixed; left: 50%; bottom: 28px;

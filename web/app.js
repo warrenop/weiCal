@@ -6,9 +6,42 @@ const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' 
 const money = (n) => fmt.format(n ?? 0);
 
 async function api(path, opts = {}) {
+  const method = (opts.method || 'GET').toUpperCase();
+  // Offline guard: writes need network; reads can fall back to the SW cache
+  if (!navigator.onLine && method !== 'GET') {
+    toast('当前离线，无法保存修改');
+    throw new Error('offline');
+  }
   const r = await fetch(path, opts);
   if (!r.ok) throw new Error((await r.text()) || r.statusText);
+  // Mark whether the SW served this from cache (set the badge state)
+  if (r.headers.get('X-Mycal-From-Cache') === '1') {
+    setOfflineStale(true);
+  }
   return r.json();
+}
+
+// Online/offline indicator + cached-data flag
+function setConnState(online) {
+  const dot = $('#conn-dot');
+  dot.classList.toggle('is-online', online);
+  dot.classList.toggle('is-offline', !online);
+  dot.title = online ? '在线' : '离线（显示缓存数据）';
+}
+function setOfflineStale(stale) {
+  // Subtle indicator: turn dot orange even when navigator.onLine is true,
+  // because the Mac backend is unreachable from this device.
+  if (stale) setConnState(false);
+}
+window.addEventListener('online',  () => setConnState(true));
+window.addEventListener('offline', () => setConnState(false));
+
+// Register service worker once at load
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .catch(err => console.warn('[sw] register failed:', err));
+  });
 }
 
 function toast(msg, ms = 2400) {
