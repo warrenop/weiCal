@@ -297,6 +297,74 @@ th { color: var(--muted); }
 }
 .month-jump:hover { transform: translateY(-1px); border-color: var(--primary); }
 
+/* ===== Budget cards ===== */
+.budget-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow .2s, border-color .2s;
+  position: relative;
+}
+.budget-card.is-warn { border-color: rgba(251, 191, 36, .55); }
+.budget-card.is-over { border-color: rgba(244, 63, 94, .65); box-shadow: 0 0 0 1px rgba(244,63,94,.2), var(--card-shadow); }
+.budget-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.budget-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.budget-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.budget-amounts { display: flex; align-items: baseline; gap: 6px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.budget-spent { font-size: 22px; font-weight: 700; }
+.budget-of { font-size: 13px; color: var(--muted); }
+.budget-bar-track {
+  height: 8px; background: var(--row-hover);
+  border-radius: 999px; overflow: hidden; margin-top: 10px;
+}
+.budget-bar-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #10b981);
+  transition: width .5s cubic-bezier(.22,1,.36,1);
+}
+.is-warn .budget-bar-fill { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.is-over .budget-bar-fill { background: linear-gradient(90deg, #f43f5e, #dc2626); }
+.budget-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.budget-actions { display: flex; gap: 4px; }
+.budget-actions button {
+  background: transparent; color: var(--muted);
+  font-size: 11px; padding: 2px 6px; border-radius: 5px;
+}
+.budget-actions button:hover { color: var(--fg); background: var(--row-hover); }
+.budget-pct-pill {
+  position: absolute; top: 14px; right: 14px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  background: rgba(16,185,129,.15); color: #10b981;
+}
+.is-warn .budget-pct-pill { background: rgba(251,191,36,.2); color: #d97706; }
+.is-over .budget-pct-pill { background: rgba(244,63,94,.2); color: #e11d48; }
+html.dark .is-warn .budget-pct-pill { color: #fbbf24; }
+html.dark .is-over .budget-pct-pill { color: #fb7185; }
+
+/* Total budget card slightly distinguished */
+.budget-card.is-total {
+  background: linear-gradient(135deg, rgba(139,92,246,.06), rgba(236,72,153,.06));
+  border-color: rgba(139,92,246,.25);
+}
+
+/* KPI badge for over-budget on Overview */
+.kpi-budget-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 500;
+}
+.kpi-budget-badge.is-warn {
+  background: rgba(251,191,36,.18); color: #b45309;
+}
+.kpi-budget-badge.is-over {
+  background: rgba(244,63,94,.18); color: #be123c;
+}
+html.dark .kpi-budget-badge.is-warn { color: #fbbf24; }
+html.dark .kpi-budget-badge.is-over { color: #fb7185; }
+
 /* ===== App-update toast ===== */
 #update-toast {
   position: fixed; left: 50%; bottom: 28px;

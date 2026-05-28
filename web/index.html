@@ -46,6 +46,7 @@
       <button data-view="overview" class="nav-btn">总览</button>
       <button data-view="list" class="nav-btn">明细</button>
       <button data-view="categories" class="nav-btn">分类</button>
+      <button data-view="budgets" class="nav-btn">预算</button>
       <button data-view="income" class="nav-btn">收入</button>
       <button data-view="imports" class="nav-btn">导入历史</button>
     </nav>
@@ -126,7 +127,7 @@
 
     <div id="overview-dashboard" class="space-y-6">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="card kpi"><div class="card-label">本月支出</div><div id="kpi-expense" class="card-value text-rose-500">—</div><div id="kpi-change" class="text-xs mt-1"></div></div>
+        <div class="card kpi"><div class="card-label">本月支出</div><div id="kpi-expense" class="card-value text-rose-500">—</div><div id="kpi-change" class="text-xs mt-1"></div><div id="kpi-budget-badge" class="hidden text-xs mt-2"></div></div>
         <div class="card kpi"><div class="card-label">本月收入</div><div id="kpi-income" class="card-value text-emerald-500">—</div></div>
         <div class="card kpi"><div class="card-label">净额</div><div id="kpi-net" class="card-value">—</div></div>
         <div class="card kpi"><div class="card-label">笔数</div><div id="kpi-count" class="card-value">—</div></div>
@@ -214,6 +215,32 @@
       </div>
       <div class="card"><div class="card-label mb-2">玫瑰图</div>
         <div id="chart-rose" class="h-80"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 视图：预算 -->
+  <section id="view-budgets" class="view hidden space-y-4">
+    <div class="flex items-center gap-3 flex-wrap">
+      <label class="text-sm text-[var(--muted)]">月份</label>
+      <select id="bg-year" class="select"></select>
+      <select id="bg-month" class="select"></select>
+      <span id="bg-summary" class="text-xs text-[var(--muted)] ml-auto"></span>
+    </div>
+    <div id="budgets-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    <div id="budgets-add" class="card">
+      <div class="card-label mb-3">添加分类预算</div>
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="block text-xs text-[var(--muted)]">分类</label>
+          <select id="bg-new-cat" class="select"></select>
+        </div>
+        <div>
+          <label class="block text-xs text-[var(--muted)]">每月预算 ¥</label>
+          <input id="bg-new-amount" type="number" min="0" step="50" placeholder="800" class="select w-32">
+        </div>
+        <button id="bg-add-btn" class="btn-success">添加</button>
+        <span class="text-xs text-[var(--muted)] ml-2">超过 70% 黄色提醒，100% 红色超支提醒。</span>
       </div>
     </div>
   </section>

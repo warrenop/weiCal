@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__, db
 from .categorizer import ALL_CATEGORIES, CATEGORY_COLORS
-from .routes import imports, summary, transactions
+from .routes import budgets, imports, summary, transactions
 
 
 def _web_dir() -> Path:
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(transactions.router)
     app.include_router(summary.router)
     app.include_router(imports.router)
+    app.include_router(budgets.router)
 
     @app.get("/api/meta")
     def meta():

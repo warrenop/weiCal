@@ -71,6 +71,7 @@ function showView(name) {
   if (name === 'overview') renderOverview();
   if (name === 'list') renderList();
   if (name === 'categories') renderCategories();
+  if (name === 'budgets') renderBudgets();
   if (name === 'income') renderIncome();
   if (name === 'imports') renderImports();
 }
@@ -194,6 +195,7 @@ async function renderOverview() {
   $('#kpi-net').classList.toggle('text-rose-500', sum.net < 0);
   $('#kpi-net').classList.toggle('text-emerald-500', sum.net > 0);
   countUp($('#kpi-count'), sum.count, false);
+  refreshKpiBudgetBadge();
   const ch = sum.expense_change;
   $('#kpi-change').innerHTML = (ch == null)
     ? '<span class="text-slate-400">无上月对比</span>'
@@ -580,7 +582,141 @@ themeListeners.push(() => {
   if (state.view === 'overview') renderOverview();
   if (state.view === 'categories') renderCategories();
   if (state.view === 'income') renderIncome();
+  if (state.view === 'budgets') renderBudgets();
 });
+
+// ---------- budgets view ----------
+function _budgetLabel(cat) { return cat === '_total' ? '本月总预算' : cat; }
+function _budgetColor(cat) {
+  if (cat === '_total') return 'linear-gradient(135deg,#8b5cf6,#ec4899)';
+  return state.meta.colors[cat] || '#94a3b8';
+}
+
+async function renderBudgets() {
+  const y = +$('#bg-year').value;
+  const m = +$('#bg-month').value;
+  const res = await api(`/api/budgets/status?year=${y}&month=${m}`);
+
+  // Summary line
+  const overCount = res.items.filter(i => i.status === 'over').length;
+  const warnCount = res.items.filter(i => i.status === 'warn').length;
+  $('#bg-summary').textContent = res.items.length
+    ? `${res.items.length} 项预算 · ${overCount} 超支 · ${warnCount} 接近上限`
+    : '还没配置预算';
+
+  // Cards
+  const grid = $('#budgets-grid');
+  grid.innerHTML = '';
+  if (!res.items.length) {
+    grid.innerHTML = `<div class="empty-state-card" style="grid-column:1/-1">
+      <div class="empty-icon-large">🎯</div>
+      <h3>还没有预算配置</h3>
+      <p>下方添加你的第一条分类预算，超过 70% 系统会自动提醒。</p>
+    </div>`;
+  }
+  for (const it of res.items) {
+    const card = document.createElement('div');
+    card.className = `budget-card is-${it.status}` + (it.category === '_total' ? ' is-total' : '');
+    const widthPct = Math.min(it.percent, 100);
+    const remaining = it.remaining >= 0
+      ? `剩 ${money(it.remaining)}`
+      : `<span style="color:#f43f5e">超支 ${money(Math.abs(it.remaining))}</span>`;
+    const colorStyle = it.category === '_total'
+      ? 'background: linear-gradient(135deg,#8b5cf6,#ec4899)'
+      : `background: ${_budgetColor(it.category)}`;
+    card.innerHTML = `
+      <div class="budget-pct-pill">${it.percent}%</div>
+      <div class="budget-head">
+        <div class="budget-name"><span class="budget-dot" style="${colorStyle}"></span>${escapeHtml(_budgetLabel(it.category))}</div>
+      </div>
+      <div class="budget-amounts">
+        <span class="budget-spent">${money(it.spent)}</span>
+        <span class="budget-of">/ ${money(it.budget)}</span>
+      </div>
+      <div class="budget-bar-track"><div class="budget-bar-fill" style="width:${widthPct}%"></div></div>
+      <div class="budget-footer">
+        <span>${remaining}</span>
+        <div class="budget-actions">
+          <button data-act="edit" data-cat="${escapeHtml(it.category)}" data-amt="${it.budget}">编辑</button>
+          <button data-act="del"  data-cat="${escapeHtml(it.category)}">删除</button>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  }
+
+  // Hook actions
+  grid.querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = async () => {
+      const cat = b.dataset.cat;
+      if (b.dataset.act === 'del') {
+        if (!confirm(`确定删除「${_budgetLabel(cat)}」的预算？`)) return;
+        await api(`/api/budgets/${encodeURIComponent(cat)}`, { method: 'DELETE' });
+        toast('已删除');
+        renderBudgets(); refreshKpiBudgetBadge();
+      } else {
+        const cur = +b.dataset.amt;
+        const v = prompt(`设置「${_budgetLabel(cat)}」每月预算（元）`, cur);
+        if (v == null) return;
+        const amt = parseFloat(v);
+        if (!(amt >= 0)) { toast('请输入有效数字'); return; }
+        await api(`/api/budgets/${encodeURIComponent(cat)}`, {
+          method: 'PUT', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ amount: amt }),
+        });
+        toast('已更新');
+        renderBudgets(); refreshKpiBudgetBadge();
+      }
+    };
+  });
+
+  // Populate "add" form with categories not yet configured
+  const configured = new Set(res.items.map(i => i.category));
+  const sel = $('#bg-new-cat');
+  sel.innerHTML = '';
+  const allOptions = ['_total', ...state.meta.categories.filter(c => c !== '收入')];
+  for (const c of allOptions) {
+    if (configured.has(c)) continue;
+    const o = document.createElement('option');
+    o.value = c; o.textContent = _budgetLabel(c);
+    sel.appendChild(o);
+  }
+  $('#bg-add-btn').disabled = sel.options.length === 0;
+}
+
+// "Add budget" submit
+function _bindBudgetAdd() {
+  $('#bg-add-btn').onclick = async () => {
+    const cat = $('#bg-new-cat').value;
+    const amt = parseFloat($('#bg-new-amount').value);
+    if (!cat) { toast('请选择分类'); return; }
+    if (!(amt >= 0)) { toast('请输入金额'); return; }
+    await api(`/api/budgets/${encodeURIComponent(cat)}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ amount: amt }),
+    });
+    $('#bg-new-amount').value = '';
+    toast('已添加');
+    renderBudgets(); refreshKpiBudgetBadge();
+  };
+}
+
+// ---------- KPI overview badge ----------
+async function refreshKpiBudgetBadge() {
+  try {
+    const alerts = await api('/api/budgets/alerts');
+    const badge = $('#kpi-budget-badge');
+    if (!alerts.length) { badge.classList.add('hidden'); badge.textContent = ''; return; }
+    // Pick the worst one
+    const worst = alerts.reduce((a, b) => b.percent > a.percent ? b : a);
+    const cls = worst.status === 'over' ? 'is-over' : 'is-warn';
+    const sign = worst.status === 'over' ? '超支' : '接近上限';
+    badge.className = `kpi-budget-badge ${cls}`;
+    badge.classList.remove('hidden');
+    badge.textContent = `${worst.status === 'over' ? '⚠️' : '🟡'} ${_budgetLabel(worst.category)} ${worst.percent}% (${sign})`;
+    badge.style.cursor = 'pointer';
+    badge.onclick = () => showView('budgets');
+  } catch {}
+}
 
 // ---------- income view ----------
 function fillYearOnly(sel, defaultY) {
@@ -785,8 +921,12 @@ function showUpdateToast(latest, repo, current, htmlUrl) {
   fillYearMonth($('#period-year'), $('#period-month'), state.year, state.month);
   fillYearMonth($('#f-year'), $('#f-month'), state.year, state.month);
   fillYearMonth($('#cat-year'), $('#cat-month'), state.year, state.month);
+  fillYearMonth($('#bg-year'), $('#bg-month'), state.year, state.month);
   fillYearOnly($('#inc-year'), state.year);
   fillCategorySelect($('#f-category'), true);
+  _bindBudgetAdd();
+  $('#bg-year').addEventListener('change', renderBudgets);
+  $('#bg-month').addEventListener('change', renderBudgets);
   $('#period-year').addEventListener('change', e => { state.year = +e.target.value; renderOverview(); });
   $('#period-month').addEventListener('change', e => { state.month = +e.target.value; renderOverview(); });
 
@@ -810,6 +950,7 @@ function showUpdateToast(latest, repo, current, htmlUrl) {
   }
   showView('overview');
   await refreshSyncStatus();
+  refreshKpiBudgetBadge();      // non-blocking
   // Fire update check after main UI is ready; non-blocking
   setTimeout(checkForUpdates, 1500);
 })();
